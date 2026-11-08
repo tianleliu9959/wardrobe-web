@@ -1,0 +1,1785 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>我的衣橱 · 以闪亮之名</title>
+<style>
+  :root {
+    --primary: #a67a32;
+    --primary-dark: #a67a32;
+    --bg: #f4f1ea;
+    --card: #fff;
+    --border: #e5dfd0;
+    --shadow: 0 2px 8px rgba(0,0,0,.04);
+    --text: #2c2b28;
+    --muted: #8a8578;
+    --accent: #a67a32;
+    --owned-border: #cfe3c8;
+    --owned-bg: #f2f7ef;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--text); }
+  header { max-width: 1400px; margin: 0 auto; padding: 20px 24px 0; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+  header h1 { font-size: 22px; font-weight: 700; }
+  .stats { display: flex; gap: 22px; }
+  .stat { text-align: center; }
+  .stat .num { font-size: 20px; font-weight: 700; color: var(--primary); }
+  .stat .lbl { font-size: 12px; color: var(--muted); }
+  .btn-upload { border: none; background: var(--primary); color: #fff; border-radius: 8px; padding: 9px 18px; font-size: 13px; font-weight: 600; cursor: pointer; transition: .15s; }
+  .btn-upload:hover { background: var(--primary-dark); }
+  .toolbar { max-width: 1400px; margin: 16px auto 0; padding: 0 24px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .toolbar select, .toolbar input { border: 1px solid var(--border); background: #fff; border-radius: 10px; padding: 9px 12px; font-size: 13px; color: var(--text); outline: none; }
+  .toolbar select:focus, .toolbar input:focus { border-color: var(--accent); }
+  .toolbar input[type=text] { flex: 1; min-width: 180px; }
+  .clear-btn { border: none; background: transparent; color: var(--accent); cursor: pointer; font-size: 13px; }
+  .search-btn { border: 1px solid var(--primary); background: var(--primary); color: #fff; border-radius: 8px; padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer; transition: .15s; }
+  .search-btn:hover { background: var(--primary-dark); }
+
+  /* 星级面包屑 tab */
+  .breadcrumb { max-width: 1400px; margin: 18px auto 0; padding: 0 24px; display: flex; flex-wrap: wrap; align-items: center; font-size: 14px; color: var(--muted); }
+  #breadcrumb { margin-top: 8px; }
+  .crumb { padding: 6px 14px; font-size: 14px; font-weight: 400; color: var(--muted); cursor: pointer; user-select: none; border-radius: 20px; transition: .15s; }
+  .crumb:hover { color: var(--text); background: rgba(0,0,0,.04); }
+  .crumb.active { color: #fff; font-weight: 700; background: var(--primary); border-radius: 20px; box-shadow: none; }
+  .crumb-sep { color: #d6d2c4; margin: 0 4px; user-select: none; }
+  /* 套装/散件 tab 行内的搜索框 */
+  #group-tab input[type=text] { flex: 1; min-width: 180px; border: 1px solid var(--border); background: #fff; border-radius: 10px; padding: 8px 12px; font-size: 13px; color: var(--text); outline: none; margin-left: auto; }
+  #group-tab input[type=text]:focus { border-color: var(--accent); }
+  #group-tab .search-btn { margin-left: 8px; }
+  /* 清空按钮与搜索同行：带边框按钮样式 */
+  #group-tab .clear-btn { margin-left: 8px; border: 1px solid var(--border); background: #fff; border-radius: 8px; padding: 8px 14px; font-size: 13px; color: var(--muted); cursor: pointer; transition: .15s; }
+  #group-tab .clear-btn:hover { color: var(--accent); border-color: var(--accent); background: #faf7ef; }
+
+  /* 大图查看 */
+  .img-mask { position: fixed; inset: 0; background: rgba(0,0,0,.75); z-index: 200; display: none; align-items: center; justify-content: center; padding: 30px; cursor: zoom-out; }
+  .img-mask.show { display: flex; }
+  .img-mask img { max-width: 94vw; max-height: 94vh; object-fit: contain; border-radius: 8px; }
+  /* 多形态左右切换（仅多形态时显示） */
+  .img-nav { position:absolute; top:50%; transform:translateY(-50%); width:46px; height:46px; border-radius:50%; border:none; background:rgba(0,0,0,.45); color:#fff; font-size:28px; line-height:44px; text-align:center; padding:0; cursor:pointer; display:none; z-index:2; }
+  .img-nav:hover { background:rgba(0,0,0,.72); }
+  .img-nav.show { display:block; }
+  .img-nav.prev { left:20px; }
+  .img-nav.next { right:20px; }
+  .img-counter { position:absolute; bottom:24px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,.55); color:#fff; font-size:13px; padding:5px 14px; border-radius:14px; display:none; z-index:2; letter-spacing:.5px; }
+  .img-counter.show { display:block; }
+  /* 最近拥有（owned_log）弹窗 */
+  .ol-mask { position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:220; display:none; align-items:center; justify-content:center; padding:16px; }
+  .ol-mask.show { display:flex; }
+  .ol-box { background:#fff; border-radius:14px; padding:14px; width:min(680px,96vw); max-height:86vh; display:flex; flex-direction:column; gap:10px; }
+  .ol-head { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .ol-title { font-size:15px; font-weight:600; }
+  .ol-tools { display:flex; align-items:center; gap:8px; }
+  .ol-tools select { border:1px solid var(--border); border-radius:8px; padding:5px 8px; font-size:12px; background:#fff; }
+  .ol-close { border:none; background:#f1ede3; width:26px; height:26px; border-radius:50%; font-size:15px; cursor:pointer; line-height:1; }
+  .ol-list { overflow:auto; display:flex; flex-direction:column; gap:6px; }
+  .ol-row { display:flex; align-items:center; gap:10px; padding:6px 8px; border:1px solid var(--border); border-radius:10px; background:#fdfbf6; cursor:pointer; }
+  .ol-row:hover { background:#f7f3e9; }
+  .ol-row.off { opacity:.55; }
+  .ol-row img { width:42px; height:42px; object-fit:contain; background:#faf8f3; border-radius:8px; flex:none; }
+  .ol-main { flex:1; min-width:0; }
+  .ol-name { font-size:13px; font-weight:600; }
+  .ol-meta { font-size:11px; color:var(--muted); margin-top:2px; }
+  .ol-time { font-size:11px; color:var(--muted); flex:none; }
+  .preview-wrap { position: relative; }
+  .f-badge { position:absolute; left:8px; top:8px; background:rgba(166,122,50,.92); color:#fff; font-size:10px; padding:2px 7px; border-radius:10px; cursor:pointer; z-index:2; letter-spacing:.4px; line-height:1.4; }
+
+  .container { max-width: 1400px; margin: 16px auto 60px; padding: 0 24px; }
+  .result-count { font-size: 13px; color: var(--muted); margin: 6px 2px 14px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+
+  .card { background: var(--card); border-radius: 18px; border: 1px solid var(--border); box-shadow: var(--shadow); overflow: hidden; transition: .2s; cursor: pointer; }
+  .card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.08); transform: translateY(-2px); }
+  .card.all-owned { border-color: var(--owned-border); background: var(--owned-bg); }
+  .card-head { padding: 14px 14px 12px; }
+  .preview-wrap { text-align: center; margin-bottom: 10px; position: relative; }
+  .thumb { width: 100%; height: 260px; border-radius: 12px; object-fit: contain; background: #faf8f3; border: 1px solid var(--border); }
+  .lazy-img { background: linear-gradient(100deg, #f3efe6 40%, #e9e3d6 50%, #f3efe6 60%); background-size: 200% 100%; animation: imgShimmer 1.4s infinite linear; }
+  .lazy-img[src] { animation: none; }
+  @keyframes imgShimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+  .owned-badge { position: absolute; top: 8px; right: 8px; background: var(--primary); color: #fff; font-size: 12px; font-weight: 700; border-radius: 10px; padding: 3px 10px; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+  .card-title { }
+  .set-name { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .gacha-link { color: var(--primary); cursor: pointer; font-size: 12px; }
+  .gacha-link:hover { color: #a3582f; }
+  .gacha-arrow { font-style: normal; font-weight: 700; color: var(--primary); margin-left: 2px; }
+  .gacha-label { color: #b8860b; font-size: 12px; }
+  .gacha-set-card { width: 110px; border: 1px solid var(--border); border-radius: 10px; padding: 6px; cursor: pointer; background: var(--bg); text-align: center; transition: transform .15s, box-shadow .15s; }
+  .gacha-set-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,.12); }
+  .gacha-set-card img { width: 100%; height: 150px; object-fit: contain; border-radius: 8px; background: #f7f5f0; }
+  .gacha-set-card .g-name { font-size: 12px; font-weight: 600; margin-top: 6px; line-height: 1.3; }
+  .gacha-set-card .g-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .gacha-set-card.loose-card.owned { background: var(--owned-bg); border-color: var(--owned-border); }
+  .gacha-set-card.loose-card .g-name { font-size: 13px; }
+  .alias-edit, .obtain-edit { display: block; width: 100%; margin-top: 8px; border: 1px dashed var(--border); border-radius: 8px; padding: 5px 10px; font-size: 12px; color: var(--muted); background: #fff; transition: border-color .2s, background .2s; }
+  .alias-edit:disabled { background: #f7f5f0; border-style: solid; cursor: not-allowed; }
+  .alias-edit.saving, .obtain-edit.saving { border-color: #60a5fa; }
+  .alias-edit.saved, .obtain-edit.saved { border-color: #34d399; background: #ecfdf5; }
+  .alias-edit.failed, .obtain-edit.failed { border-color: #f87171; background: #fef2f2; }
+  /* 非兑换商铺来源只读展示 */
+  .obtain-readonly { display: block; width: 100%; margin-top: 8px; font-size: 12px; color: var(--muted); padding: 5px 2px; }
+  .set-meta { margin-top: 5px; font-size: 12px; color: var(--muted); line-height: 1.4; }
+  .stars { color: #c9963f; font-size: 14px; letter-spacing: 1px; }
+  .attr-tag { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 500; background: #f1ecdf; color: #6e5b35; margin-left: 4px; }
+  /* 来源标签：过长自动换行，最多两行 */
+  .source-tag { display: block; margin-top: 6px; font-size: 11px; color: #7a6a4a; background: #faf6ec; border: 1px solid #ede4d0; border-radius: 6px; padding: 3px 8px; line-height: 1.4; word-break: break-all; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .progress-bar { margin-top: 10px; height: 6px; background: #ece6d8; border-radius: 3px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--primary); }
+  .progress-text { font-size: 12px; color: var(--muted); margin-top: 4px; text-align: right; }
+
+  /* 进度文字行可点击查看部件 */
+  .progress-text.clickable { cursor: pointer; transition: .15s; }
+  .progress-text.clickable:hover { color: var(--primary); }
+  .progress-text.clickable:hover .progress-arrow { transform: translateX(2px); }
+  .progress-arrow { display: inline-block; color: var(--muted); transition: transform .15s; }
+
+  /* 详情弹窗：以全部部件网格为主 */
+  .detail-modal .modal { width: min(860px, 96vw); }
+  .detail-head { display: flex; align-items: center; gap: 16px; padding-bottom: 14px; margin-bottom: 14px; border-bottom: 1px solid var(--border); }
+  .detail-preview { width: 120px; height: 120px; object-fit: contain; border-radius: 10px; background: #faf8f3; border: 1px solid var(--border); cursor: pointer; flex-shrink: 0; }
+  .detail-info { flex: 1; min-width: 0; }
+  .detail-info .set-name { font-size: 22px; font-weight: 800; line-height: 1.25; }
+  .detail-info .set-meta { font-size: 14px; margin-top: 4px; }
+  .detail-count { font-size: 14px; color: var(--muted); margin-top: 6px; }
+  .detail-count .owned-num { color: var(--primary); font-weight: 700; }
+  /* 部件列表：一行2列，左图片右名称 */
+  .detail-items { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; max-height: 62vh; overflow-y: auto; padding-right: 2px; }
+  @media (min-width: 720px) { .detail-items { grid-template-columns: repeat(3, 1fr); } }
+  .part-cell { position: relative; display: flex; align-items: center; gap: 10px; border: 1px solid var(--border); border-radius: 10px; background: #fff; padding: 8px; cursor: pointer; transition: .15s; overflow: hidden; }
+  .part-cell:hover { border-color: var(--accent); box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+  .part-cell.owned { background: var(--owned-bg); border-color: var(--owned-border); }
+  .part-cell-img { width: 64px; height: 64px; object-fit: contain; background: #faf8f3; border: 1px solid var(--border); border-radius: 8px; flex-shrink: 0; display: block; }
+  .part-cell-info { flex: 1; min-width: 0; }
+  .part-cell-name { font-size: 15px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .part-cell.owned .part-cell-name::before { content: "✓ "; color: var(--primary); }
+  .part-cell-type { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .part-cell-check { flex-shrink: 0; display: flex; align-items: center; cursor: pointer; padding: 8px 6px; margin-right: -2px; }
+  .part-cell-check input { width: 18px; height: 18px; accent-color: var(--primary); cursor: pointer; margin: 0; }
+
+  /* 上传弹窗 */
+  .modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 150; display: none; align-items: center; justify-content: center; padding: 20px; }
+  .modal-mask.show { display: flex; }
+  .modal { background: #fff; border-radius: 18px; width: min(540px, 96vw); max-height: 88vh; overflow-y: auto; padding: 22px 24px; box-shadow: 0 8px 24px rgba(0,0,0,.18); }
+  .modal h3 { font-size: 17px; margin-bottom: 14px; }
+  .modal .close-modal { margin-top: 14px; border: none; background: var(--primary); color: #fff; border-radius: 8px; padding: 10px 22px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .type-filter-wrap { margin-bottom: 12px; }
+  .type-filter-wrap label { font-size: 13px; color: var(--muted); margin-right: 8px; }
+  .type-filter-wrap select { border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: 13px; }
+  .drop-zone { border: 2px dashed var(--border); border-radius: 14px; padding: 28px 16px; text-align: center; cursor: pointer; color: var(--muted); transition: .15s; }
+  .drop-zone.dragover { border-color: var(--primary); background: #faf6ec; color: var(--text); }
+  .drop-zone small { display: block; margin-top: 6px; font-size: 11px; }
+  .start-btn, .pause-btn { margin-top: 12px; border: none; border-radius: 8px; padding: 10px 22px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .start-btn { background: var(--primary); color: #fff; }
+  .start-btn:hover { background: var(--primary-dark); }
+  .start-btn:disabled { opacity: .6; cursor: not-allowed; }
+  .pause-btn { background: #8e4f30; color: #fff; margin-left: 8px; }
+  .pause-btn:hover { background: #6e3a22; }
+  .result-box { margin-top: 14px; padding: 12px; background: var(--bg); border-radius: 10px; max-height: 200px; overflow-y: auto; font-size: 13px; color: var(--text); }
+  .result-box .item { padding: 4px 0; border-bottom: 1px dashed var(--border); }
+  .result-box .item:last-child { border-bottom: none; }
+
+  .empty { text-align: center; padding: 60px 20px; color: var(--muted); font-size: 14px; display: none; }
+  .pagination { margin-top: 22px; display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+  .page-btn { border: 1px solid var(--border); background: #fff; color: var(--text); border-radius: 6px; padding: 6px 12px; font-size: 13px; cursor: pointer; }
+  .page-btn:hover:not([disabled]) { border-color: var(--primary); color: var(--primary); }
+  .page-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .page-btn[disabled] { opacity: .5; cursor: not-allowed; }
+  .page-info { color: var(--muted); padding: 6px; }
+
+  /* ===== 手机端适配 ===== */
+  @media (max-width: 768px) {
+    /* 顶栏：统计与按钮换行堆叠，避免挤在一起 */
+    header { padding: 14px 14px 0; flex-direction: column; align-items: stretch; gap: 12px; }
+    header h1 { font-size: 18px; }
+    .stats { gap: 14px; justify-content: space-between; }
+    .stat .num { font-size: 18px; }
+    header > div:last-child { flex-wrap: wrap; }
+    header .btn-upload { flex: 1 1 auto; padding: 11px 12px; font-size: 13px; }
+
+    /* 分组 tab 行（套装/散件 + 搜索 + 清空）：crumbs 第一行横滑，搜索+按钮独立一行不换行 */
+    .breadcrumb { padding: 0 14px; flex-wrap: wrap; gap: 8px; align-items: center; }
+    #group-tab { margin-top: 10px; }
+    #breadcrumb { padding: 0 14px; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; gap: 4px; }
+    .breadcrumb .crumb { flex: 0 0 auto; padding: 6px 12px; font-size: 13px; white-space: nowrap; }
+    /* 搜索行：整行独占、内部不换行，搜索框自适应收缩、按钮定宽 */
+    .search-row { flex: 1 1 100%; display: flex; gap: 8px; align-items: center; }
+    #group-tab input[type=text] { flex: 1 1 auto; min-width: 0; }
+    #group-tab .search-btn, #group-tab .clear-btn { flex: 0 0 auto; padding: 9px 12px; }
+
+    /* 工具栏筛选：2×2 网格，不挤成四行也不横滑 */
+    .toolbar { padding: 0 14px; gap: 10px; }
+    .toolbar select, .toolbar input { flex: 1 1 calc(50% - 5px); width: auto; font-size: 14px; padding: 11px 12px; }
+
+    /* 卡片网格单列 */
+    .container { padding: 0 14px; margin: 12px auto 40px; }
+    .grid { grid-template-columns: 1fr; gap: 14px; }
+    .thumb { height: 220px; }
+    .card-head { padding: 14px 14px 10px; }
+    .set-name { font-size: 16px; }
+
+    /* 弹窗：手机端全屏沉浸，header 固定，body 滚动 */
+    .modal-mask { padding: 0; align-items: stretch; }
+    .modal { width: 100vw; height: 100dvh; max-height: none; border-radius: 0; padding: 18px 16px 40px; }
+    .modal h3 { font-size: 18px; }
+    .modal .close-modal { width: 100%; padding: 13px; font-size: 15px; }
+    /* 详情弹窗 */
+    .detail-modal .modal { width: 100vw; }
+    .detail-head { flex-direction: column; align-items: flex-start; gap: 10px; }
+    .detail-preview { width: 140px; height: 140px; align-self: center; }
+    .detail-info .set-name { font-size: 19px; }
+    .detail-items { grid-template-columns: repeat(2, 1fr); gap: 10px; max-height: none; }
+    .part-cell-img { width: 60px; height: 60px; }
+    .part-cell-name { font-size: 14px; }
+
+    /* 分页按钮放大点击区 */
+    .page-btn { padding: 8px 14px; font-size: 14px; }
+
+    /* 卡池弹窗套装卡片：手机端双列自适应铺满 */
+    #gacha-sets { gap: 10px; }
+    .gacha-set-card { width: calc(50% - 5px); }
+    .gacha-set-card img { height: 170px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>我的衣橱 · 以闪亮之名</h1>
+  <div class="stats">
+    <div class="stat"><div class="num" id="st-set">-</div><div class="lbl">套装</div></div>
+    <div class="stat"><div class="num" id="st-item">-</div><div class="lbl">部件</div></div>
+    <div class="stat"><div class="num" id="st-owned">-</div><div class="lbl">已拥有部件</div></div>
+    <div class="stat"><div class="num" id="st-owned-set">-</div><div class="lbl">已拥有套装</div></div>
+  </div>
+  <div style="display:flex; gap:8px; align-items:center;">
+    <button class="btn-upload" id="btn-ai-match" style="background:#4c6ef5;">AI 识别匹配</button>
+    <button class="btn-upload" id="btn-wishlist">心愿单</button>
+    <button class="btn-upload" id="btn-upload">补充最新衣橱</button>
+  </div>
+</header>
+
+<!-- 套装/散件分组 tab + 搜索 + 清空 -->
+<div class="breadcrumb" id="group-tab">
+  <div class="crumb active" data-view="set">套装</div><span class="crumb-sep">/</span>
+  <div class="crumb" data-view="loose">散件</div>
+  <span class="search-row">
+    <input type="text" id="f-search" placeholder="搜索套装 / 别名 / 部件名（即时）">
+    <button class="search-btn" id="btn-search">搜索</button>
+    <button class="clear-btn" id="btn-clear">清空</button>
+  </span>
+</div>
+
+<!-- 星级面包屑 tab -->
+<div class="breadcrumb" id="breadcrumb">
+  <div class="crumb active" data-star="">全部</div><span class="crumb-sep">/</span>
+  <div class="crumb" data-star="6">6 星</div><span class="crumb-sep">/</span>
+  <div class="crumb" data-star="5">5 星</div><span class="crumb-sep">/</span>
+  <div class="crumb" data-star="4">4 星</div><span class="crumb-sep">/</span>
+  <div class="crumb" data-star="3">3 星</div><span class="crumb-sep">/</span>
+  <div class="crumb" data-star="unknown">未知</div>
+</div>
+
+<div class="toolbar">
+  <select id="f-attr"><option value="">全部风格</option></select>
+  <select id="f-type"><option value="">全部部位</option></select>
+  <select id="f-owned">
+    <option value="">全部状态</option>
+    <option value="owned">已拥有</option>
+    <option value="notowned">未拥有</option>
+  </select>
+  <select id="f-obtain"><option value="">全部来源</option></select>
+  <button class="clear-btn" id="btn-owned-log" title="查看最近标记拥有的部件">最近拥有</button>
+</div>
+
+<div class="container">
+  <div class="result-count" id="result-count"></div>
+  <div class="grid" id="grid"></div>
+  <div class="empty" id="empty" style="display:none">没有符合条件的套装</div>
+  <div class="pagination" id="pagination"></div>
+</div>
+
+<!-- 上传截图弹窗（仅截图，限定部位） -->
+<div class="modal-mask" id="modal-mask">
+  <div class="modal">
+    <h3 id="modal-title">补充最新衣橱（上传截图识别部件）</h3>
+    <div class="type-filter-wrap" id="type-filter-wrap">
+      <label style="font-size:13px; color:var(--muted); margin-right:8px;">限定部位（必选）</label>
+      <select id="upload-type" style="border:1px solid var(--border); border-radius:8px; padding:6px 10px; font-size:13px;">
+        <option value="">请选择部位</option>
+      </select>
+    </div>
+    <div class="drop-zone" id="drop-zone">
+      <span id="drop-hint">点击选择或拖拽截图到此处<br>
+      <small>支持 jpg / png / webp；请先选部位，再上传该部位的截图识别</small></span>
+    </div>
+    <input type="file" id="file-input" accept="image/*" multiple style="display:none">
+    <div id="file-picked" style="display:none; margin-top:12px; padding:10px 12px; background:var(--bg); border:1px solid var(--border); border-radius:10px; font-size:13px; color:var(--text); word-break:break-all;"></div>
+    <button class="start-btn" id="btn-start" style="display:none">开始识别</button>
+    <div class="result-box" id="result-box"></div>
+    <button class="close-modal" id="btn-close" style="display:none">完成</button>
+  </div>
+</div>
+
+<!-- AI 识别匹配弹窗 -->
+<div class="modal-mask" id="ai-match-mask">
+  <div class="modal" style="width:min(720px,96vw);">
+    <h3>AI 识别匹配部件</h3>
+    <div class="type-filter-wrap">
+      <label style="font-size:13px; color:var(--muted); margin-right:8px;">限定部位（必选）</label>
+      <select id="ai-type-select" style="border:1px solid var(--border); border-radius:8px; padding:6px 10px; font-size:13px;"></select>
+    </div>
+    <div class="type-filter-wrap" style="margin-top:8px;">
+      <label style="font-size:13px; color:var(--muted); margin-right:8px;">识别模式</label>
+      <label style="margin-right:12px; font-size:13px; cursor:pointer;"><input type="radio" name="ai-mode" value="coarse" checked style="accent-color:var(--primary);"> 粗排（快）</label>
+      <label style="font-size:13px; cursor:pointer;"><input type="radio" name="ai-mode" value="precise" style="accent-color:var(--primary);"> 精排（准，较慢）</label>
+    </div>
+    <div class="drop-zone" id="ai-drop-zone" style="margin-top:10px;">
+      <span>点击选择或拖拽衣橱截图<br><small>支持 jpg/png/webp，大图会保存</small></span>
+    </div>
+    <input type="file" id="ai-file-input" accept="image/*" style="display:none">
+    <div id="ai-file-picked" style="display:none; margin-top:10px; padding:10px 12px; background:var(--bg); border:1px solid var(--border); border-radius:10px; font-size:13px; color:var(--text); word-break:break-all;"></div>
+    <button class="start-btn" id="ai-btn-start" style="display:none">开始识别</button>
+    <div id="ai-result" style="margin-top:12px;"></div>
+    <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:10px;">
+      <button class="close-modal" id="ai-btn-log" style="display:none">查看日志</button>
+      <button class="close-modal" id="ai-btn-close" style="display:none">完成</button>
+    </div>
+  </div>
+</div>
+
+<!-- 心愿单弹窗 -->
+<div class="modal-mask" id="wishlist-mask">
+  <div class="modal" style="width:min(720px,96vw);">
+    <h3>心愿单</h3>
+    <div id="wishlist-items" style="margin-top:8px;"></div>
+  </div>
+</div>
+
+<!-- 详情弹窗（点击遮罩关闭） -->
+<div class="modal-mask detail-modal" id="detail-mask">
+  <div class="modal">
+    <div class="detail-head" id="detail-head"></div>
+    <div class="detail-items" id="detail-items"></div>
+  </div>
+</div>
+
+<!-- 卡池弹窗（限时追光，点击展示同卡池所有套装，点击遮罩关闭） -->
+<div class="modal-mask" id="gacha-mask">
+  <div class="modal">
+    <h3 id="gacha-title"></h3>
+    <div id="gacha-sets" style="display:flex; flex-wrap:wrap; gap:12px; margin-top:8px;"></div>
+  </div>
+</div>
+
+<!-- 最近拥有（owned_log）弹窗 -->
+<div class="ol-mask" id="ol-mask">
+  <div class="ol-box">
+    <div class="ol-head">
+      <div class="ol-title">最近标记拥有</div>
+      <div class="ol-tools">
+        <select id="ol-type"><option value="">全部部位</option></select>
+        <select id="ol-limit">
+          <option value="20">20 条</option>
+          <option value="50">50 条</option>
+          <option value="200">200 条</option>
+        </select>
+        <button class="ol-close" id="ol-close" title="关闭">×</button>
+      </div>
+    </div>
+    <div class="ol-list" id="ol-list"></div>
+  </div>
+</div>
+
+<!-- 大图查看（多形态时左右切换） -->
+<div class="img-mask" id="img-mask">
+  <button class="img-nav prev" id="img-prev" title="上一个形态（← 或点图片左半区）">‹</button>
+  <img id="img-big" src="" alt="">
+  <button class="img-nav next" id="img-next" title="下一个形态（→ 或点图片右半区）">›</button>
+  <div class="img-counter" id="img-counter"></div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let ALL_SETS = [];
+let ALL_LOOSE = [];   // 散件（set_id 为空）
+let viewMode = "set"; // 'set'=套装 | 'loose'=散件
+let filters = { star: "", attr: "", type: "", owned: "", obtain: "", search: "" };
+
+const OBTAIN_LIMITED = "限时追光";
+const OBTAIN_LIMITED_5 = "限时追光·五星卡池";
+const OBTAIN_LIMITED_6 = "限时追光·六星卡池";
+const OBTAIN_LIMITED_BOX = "限时追光·盲盒";
+// 散件来源聚合规则：按顺序匹配，未命中归「其他」
+const LOOSE_OBTAIN_GROUPS = [
+  { id: "limited",    label: "限时追光", test: o => o.startsWith(OBTAIN_LIMITED) },
+  { id: "permanent",  label: "常驻追光", test: o => o.startsWith("常驻追光") },
+  { id: "decompose",  label: "限时分解", test: o => o.startsWith("限时分解") },
+  // 主线（关卡掉落主线普通/困难、完美奖励主线普通 等）：必须排在「关卡掉落」之前，
+  // 否则「关卡掉落主线困难1-2/1-9」会先命中「关卡掉落」（三星散件大头就是主线掉落）
+  { id: "mainline",   label: "主线",     test: o => o.includes("主线") },
+  { id: "stage",      label: "关卡掉落", test: o => o.startsWith("关卡掉落") },
+  { id: "recharge",   label: "充值",     test: o => o.startsWith("充值") },
+  { id: "free",       label: "免活",     test: o => o.startsWith("免活") },
+  { id: "exchange",   label: "兑换",     test: o => o.startsWith("兑换") || o.startsWith("返利兑换") },
+  { id: "shop",       label: "服装店购买", test: o => o.startsWith("服装店") },
+  { id: "bond",       label: "羁绊进化", test: o => o.startsWith("羁绊进化") },
+  { id: "checkin",    label: "追光累签", test: o => o.startsWith("追光累签") },
+  { id: "perfect",    label: "完美奖励", test: o => o.startsWith("完美奖励") },
+  { id: "fashion",    label: "时尚商城", test: o => o.startsWith("时尚商城") },
+  { id: "flow",       label: "流量商店", test: o => o.startsWith("流量商店") },
+  { id: "other",      label: "其他",     test: () => true },
+];
+const LOOSE_OBTAIN_PREFIX = "GROUP:";
+function obtainGroupOf(obtain) {
+  const o = obtain || "";
+  for (const g of LOOSE_OBTAIN_GROUPS) if (g.test(o)) return g;
+  return LOOSE_OBTAIN_GROUPS[LOOSE_OBTAIN_GROUPS.length - 1];
+}
+// 卡池名 → 该卡池下是否含 6 星套装（用于区分五星独立卡池 vs 六星卡池）
+let GACHA_HAS_6STAR = {};
+
+// 部位显示顺序：与后端 app.py TYPE_ORDER 保持一致（先衣服主体，再头部/脸部装饰，再其它配饰），
+// 库中新增的未知类型由 typeRank 兜底排最后，与 recognize 页一致
+const TYPE_ORDER = [
+  "发型", "连衣裙", "外套", "上衣", "下装", "袜子", "鞋子",
+  "帽子", "发饰", "面饰",
+  "颈饰", "耳饰", "腕饰", "戒指", "手套", "脚链", "斜挎", "手持物",
+  "背饰", "翅膀", "纹身", "尾巴", "悬浮", "座驾",
+];
+const TYPE_INDEX = {};
+TYPE_ORDER.forEach((t, i) => { TYPE_INDEX[t] = i; });
+function typeRank(t) { return TYPE_INDEX[t] !== undefined ? TYPE_INDEX[t] : TYPE_ORDER.length; }
+
+function starsOf(n) {
+  const c = parseInt(n, 10);
+  if (!c) return '<span class="stars">—</span>';
+  return '<span class="stars">' + "★".repeat(c) + '</span>';
+}
+
+function escapeHtml(s) {
+  return (s || "").replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
+}
+
+// 从限时追光散件的 obtain 中提取卡池名（obtain 形如「限时追光无瑕之蕊」）
+function gachaNameOf(obtain) {
+  const s = (obtain || "").trim();
+  if (s.startsWith(OBTAIN_LIMITED)) return s.slice(OBTAIN_LIMITED.length).trim();
+  return s;
+}
+
+// 预计算：卡池名 → 该卡池下是否含 6 星套装
+function buildGachaStarMap() {
+  const map = {};
+  for (const s of ALL_SETS) {
+    if (s.obtain !== OBTAIN_LIMITED) continue;
+    const g = s.gacha || "";
+    if (!g) continue;
+    if (s.star === "6") map[g] = true;
+    else if (!(g in map)) map[g] = false;
+  }
+  return map;
+}
+
+// 套装视图下该星级是否存在任何套装（3星/未知星级在套装中不存在，仅散件有）
+function starHasSets(star) {
+  if (!ALL_SETS.length) return true;
+  if (star === "unknown") return ALL_SETS.some(s => s.star === "");
+  if (!star) return true;
+  return ALL_SETS.some(s => s.star === star);
+}
+
+// 判定限时追光子类：返回 OBTAIN_LIMITED_5 / OBTAIN_LIMITED_6 / OBTAIN_LIMITED_BOX，非限时返回空串
+function limitedSubtype(gachaName) {
+  const g = (gachaName || "").trim();
+  if (!g) return "";
+  if (g.includes("盲盒")) return OBTAIN_LIMITED_BOX;
+  if (GACHA_HAS_6STAR[g]) return OBTAIN_LIMITED_6;
+  return OBTAIN_LIMITED_5;
+}
+
+async function loadData() {
+  restoreState();
+  const res = await fetch("/api/sets");
+  const data = await res.json();
+  ALL_SETS = data.sets || [];
+  ALL_LOOSE = data.loose || [];
+  // 兜底：恢复状态后若套装视图下星级无套装（如 3 星/未知），自动切到散件视图，避免空结果
+  if (viewMode === "set" && filters.star && !starHasSets(filters.star)) {
+    viewMode = "loose";
+  }
+  const attrs = [...new Set([...ALL_SETS.map(s => s.attribute), ...ALL_LOOSE.map(i => i.attribute)].filter(Boolean))].sort();
+  // 部件下拉：与 recognize 页同规则——TYPE_ORDER 内按固定顺序，库中新增未知类型按字典序补到末尾
+  const presentTypes = new Set([...ALL_SETS.flatMap(s => s.items.map(i => i.type)), ...ALL_LOOSE.map(i => i.type)].filter(Boolean));
+  const types = [...TYPE_ORDER.filter(t => presentTypes.has(t)), ...[...presentTypes].filter(t => typeRank(t) === TYPE_ORDER.length).sort()];
+  const obtains = [...new Set(ALL_SETS.map(s => s.obtain).filter(Boolean))].sort();
+  GACHA_HAS_6STAR = buildGachaStarMap();
+  fillSelect("f-attr", attrs);
+  fillSelect("f-type", types);
+  fillSelect("upload-type", TYPE_ORDER.filter(t => t));
+  // 恢复搜索/筛选状态（返回本页时保持之前的搜索词、筛选、页码、视图）
+  $("f-attr").value = filters.attr || "";
+  $("f-type").value = filters.type || "";
+  $("f-owned").value = filters.owned || "";
+  $("f-obtain").value = filters.obtain || "";
+  $("f-search").value = filters.search || "";
+  // 来源选项按当前视图填充（无效来源会被自动重置，避免组合筛选为空）
+  fillObtainSelect();
+  document.querySelectorAll("#group-tab .crumb").forEach(c => c.classList.toggle("active", c.dataset.view === viewMode));
+  document.querySelectorAll("#breadcrumb .crumb").forEach(c => c.classList.toggle("active", c.dataset.star === filters.star));
+  sortSets();
+  render();
+  loadStats();
+}
+
+function fillSelect(id, opts) {
+  const sel = $(id);
+  // 保留首项
+  const first = sel.options[0] ? sel.options[0].outerHTML : "";
+  sel.innerHTML = first;
+  opts.forEach(o => {
+    if (!o) return;
+    const op = document.createElement("option");
+    op.value = o; op.textContent = o;
+    sel.appendChild(op);
+  });
+}
+
+// 来源下拉：套装视图列普通来源（5星tab时限时追光扩展）；散件视图按聚合大类（充值/免活/关卡掉落等）
+function fillObtainSelect() {
+  const sel = $("f-obtain");
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">全部来源</option>';
+  const add = (value, text) => {
+    const op = document.createElement("option");
+    op.value = value; op.textContent = text;
+    sel.appendChild(op);
+  };
+  if (viewMode === "loose") {
+    // 散件视图：来源聚合为大类，仅列当前星级筛选下实际存在的大类（数量为 0 的如「限时追光」不显示）
+    let pool = ALL_LOOSE;
+    if (filters.star && !filters.search) {
+      pool = pool.filter(i => filters.star === "unknown" ? (i.star === "") : (i.star === filters.star));
+    }
+    const count = {};
+    for (const i of pool) {
+      const g = obtainGroupOf(i.obtain);
+      count[g.id] = (count[g.id] || 0) + 1;
+    }
+    for (const g of LOOSE_OBTAIN_GROUPS) {
+      if (!count[g.id]) continue;
+      add(LOOSE_OBTAIN_PREFIX + g.id, `${g.label}（${count[g.id]}）`);
+    }
+  } else {
+    // 套装视图：默认只列普通来源；当选中「5星」tab 时，「限时追光」扩展为 4 项
+    const obtains = [...new Set(ALL_SETS.map(s => s.obtain).filter(Boolean))].sort();
+    for (const o of obtains) {
+      if (o === OBTAIN_LIMITED) {
+        if (filters.star === "5") {
+          // 5 星 tab：限时追光拆成 4 项
+          add(OBTAIN_LIMITED, "限时追光（全部）");
+          add(OBTAIN_LIMITED_5, "限时追光 · 五星卡池");
+          add(OBTAIN_LIMITED_6, "限时追光 · 六星卡池");
+          add(OBTAIN_LIMITED_BOX, "限时追光 · 盲盒");
+        } else {
+          add(OBTAIN_LIMITED, OBTAIN_LIMITED);
+        }
+      } else {
+        add(o, o);
+      }
+    }
+  }
+  sel.value = cur;
+  // 当前所选来源在新视图选项中不存在时（如跨视图残留），重置避免组合筛选为空
+  if (cur && sel.value !== cur) {
+    filters.obtain = "";
+    sel.value = "";
+  }
+}
+
+// 版本号比较（x.y.z 数字比较），无法解析的放最前（视为最新/未知）
+function versionKey(v) {
+  const s = String(v || "").trim();
+  const m = s.match(/^(\d+)(?:\.(\d+))?(?:\.(\d+))?/);
+  if (!m) return [0, 0, 0];
+  return [parseInt(m[1] || 0, 10), parseInt(m[2] || 0, 10), parseInt(m[3] || 0, 10)];
+}
+
+function sortSets() {
+  ALL_SETS.sort((a, b) => {
+    // 1) 优先版本：新版本在前
+    const va = versionKey(a.version);
+    const vb = versionKey(b.version);
+    if (va[0] !== vb[0]) return vb[0] - va[0];
+    if (va[1] !== vb[1]) return vb[1] - va[1];
+    if (va[2] !== vb[2]) return vb[2] - va[2];
+    // 2) 版本相同时，限时追光排第一
+    const la = (a.obtain === OBTAIN_LIMITED) ? 0 : 1;
+    const lb = (b.obtain === OBTAIN_LIMITED) ? 0 : 1;
+    if (la !== lb) return la - lb;
+    return (b.id || 0) - (a.id || 0);
+  });
+}
+
+function getFiltered() {
+  return ALL_SETS.map(s => {
+    // 搜索时忽略星级 tab（避免搜索词与星级联动冲突导致无结果）
+    if (filters.star && !filters.search) {
+      if (filters.star === "unknown" && s.star !== "") return null;
+      if (filters.star !== "unknown" && s.star !== filters.star) return null;
+    }
+    if (filters.attr && s.attribute !== filters.attr) return null;
+    if (filters.obtain) {
+      if (filters.obtain === OBTAIN_LIMITED) {
+        if (s.obtain !== OBTAIN_LIMITED) return null;
+      } else if ([OBTAIN_LIMITED_5, OBTAIN_LIMITED_6, OBTAIN_LIMITED_BOX].includes(filters.obtain)) {
+        if (s.obtain !== OBTAIN_LIMITED) return null;
+        if (limitedSubtype(s.gacha) !== filters.obtain) return null;
+      } else if (s.obtain !== filters.obtain) return null;
+    }
+
+    let items = filters.type ? s.items.filter(i => i.type === filters.type) : s.items;
+    if (filters.type && items.length === 0) return null;
+    if (filters.owned === "owned" && !items.some(i => i.owned)) return null;
+    if (filters.owned === "notowned" && items.every(i => i.owned)) return null;
+
+    if (filters.search) {
+      const q = filters.search.toLowerCase();
+      // 搜索词同时匹配：套装名 / 别名 / 部件名 / 卡池名(gacha) / 来源(obtain)
+      const hay = (s.name + " " + (s.alias || "") + " " + (s.gacha || "") + " " + (s.obtain || "") + " " + items.map(i => i.name).join(" ")).toLowerCase();
+      if (!hay.includes(q)) return null;
+    }
+
+    items = items.slice().sort((a, b) => typeRank(a.type) - typeRank(b.type));
+    return { ...s, items };
+  }).filter(Boolean);
+}
+
+// 散件过滤 + 排序（星级高到低 → 版本号新到旧）
+function looseRank(i) {
+  const c = parseInt(i.star, 10);
+  return isNaN(c) ? -1 : c;
+}
+function sortLoose(list) {
+  return list.sort((a, b) => {
+    const sa = looseRank(a), sb = looseRank(b);
+    if (sa !== sb) return sb - sa;   // 星级高优先
+    const va = versionKey(a.version), vb = versionKey(b.version);
+    if (va[0] !== vb[0]) return vb[0] - va[0];
+    if (va[1] !== vb[1]) return vb[1] - va[1];
+    if (va[2] !== vb[2]) return vb[2] - va[2];
+    // 版本相同时，限时追光排第一
+    const la = (a.obtain === OBTAIN_LIMITED) ? 0 : 1;
+    const lb = (b.obtain === OBTAIN_LIMITED) ? 0 : 1;
+    if (la !== lb) return la - lb;
+    return (b.id || 0) - (a.id || 0);
+  });
+}
+function getFilteredLoose() {
+  const list = ALL_LOOSE.map(i => {
+    // 搜索时忽略星级 tab
+    if (filters.star && !filters.search) {
+      if (filters.star === "unknown" && i.star !== "") return null;
+      if (filters.star !== "unknown" && i.star !== filters.star) return null;
+    }
+    if (filters.attr && i.attribute !== filters.attr) return null;
+    if (filters.type && i.type !== filters.type) return null;
+    if (filters.owned === "owned" && !i.owned) return null;
+    if (filters.owned === "notowned" && i.owned) return null;
+    if (filters.obtain) {
+      // 散件聚合大类：GROUP:xxx 匹配该组下所有散件
+      if (filters.obtain.startsWith(LOOSE_OBTAIN_PREFIX)) {
+        const gid = filters.obtain.slice(LOOSE_OBTAIN_PREFIX.length);
+        const g = LOOSE_OBTAIN_GROUPS.find(x => x.id === gid);
+        if (!g || !g.test(i.obtain || "")) return null;
+      } else {
+        const isLimited = (i.obtain || "").startsWith(OBTAIN_LIMITED);
+        if (filters.obtain === OBTAIN_LIMITED) {
+          if (!isLimited) return null;
+        } else if ([OBTAIN_LIMITED_5, OBTAIN_LIMITED_6, OBTAIN_LIMITED_BOX].includes(filters.obtain)) {
+          if (!isLimited) return null;
+          if (limitedSubtype(gachaNameOf(i.obtain)) !== filters.obtain) return null;
+        } else if (i.obtain !== filters.obtain) return null;
+      }
+    }
+    if (filters.search) {
+      const q = filters.search.toLowerCase();
+      // 搜索词同时匹配：散件名 / 风格 / 部位 / 来源（含卡池名，如"限时追光无瑕之蕊"）
+      if (!(i.name + " " + (i.attribute || "") + " " + (i.type || "") + " " + (i.obtain || "")).toLowerCase().includes(q)) return null;
+    }
+    return i;
+  }).filter(Boolean);
+  return sortLoose(list);
+}
+
+const PAGE_SIZE = 28;
+let currentPage = 1;
+
+// ---- 搜索/筛选状态持久化：从详情页(/set/xxx)返回后恢复搜索词、筛选、页码、视图 ----
+const STATE_KEY = "yslz_index_state";
+function saveState() {
+  try {
+    localStorage.setItem(STATE_KEY, JSON.stringify({ filters, currentPage, viewMode }));
+  } catch (e) { /* localStorage 不可用时忽略 */ }
+}
+function restoreState() {
+  try {
+    const raw = localStorage.getItem(STATE_KEY);
+    if (!raw) return;
+    const st = JSON.parse(raw);
+    if (!st || !st.filters) return;
+    filters = Object.assign({ star: "", attr: "", type: "", owned: "", obtain: "", search: "" }, st.filters);
+    if (Number.isFinite(st.currentPage) && st.currentPage > 0) currentPage = st.currentPage;
+    if (st.viewMode === "loose" || st.viewMode === "set") viewMode = st.viewMode;
+  } catch (e) { /* 解析失败忽略 */ }
+}
+
+function render() {
+  saveState();
+  if (viewMode === "loose") { renderLoose(); return; }
+  const list = getFiltered();
+  const grid = $("grid");
+  const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+  if (currentPage > totalPages) currentPage = totalPages;
+  if (currentPage < 1) currentPage = 1;
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const pageItems = list.slice(start, start + PAGE_SIZE);
+
+  $("result-count").textContent = `共 ${list.length} 个套装，第 ${currentPage}/${totalPages} 页`;
+  if (list.length === 0) {
+    grid.innerHTML = "";
+    $("empty").style.display = "block";
+    $("pagination").innerHTML = "";
+    return;
+  }
+  $("empty").style.display = "none";
+
+  grid.innerHTML = pageItems.map(s => {
+    const ownedCount = s.items.filter(i => i.owned).length;
+    const total = s.items.length;
+    const pct = total > 0 ? Math.round(ownedCount / total * 100) : 0;
+    const allOwned = total > 0 && ownedCount === total;
+    const canAlias = (s.obtain || "").includes("限时");
+    const aliasHtml = canAlias
+      ? `<input class="alias-edit" value="${escapeHtml(s.alias || '')}" placeholder="填别名" data-setid="${s.id}">`
+      : "";
+
+    return `
+      <div class="card ${allOwned ? "all-owned" : ""}" data-setid="${s.id}">
+        <div class="card-head">
+          <div class="preview-wrap">
+            <img class="thumb lazy-img" loading="lazy" decoding="async" src="${escapeHtml(s.preview || '')}" alt="${escapeHtml(s.name)}" onerror="this.style.visibility='hidden'" data-full="${escapeHtml(s.preview || '')}">
+            ${ownedCount > 0 ? `<span class="owned-badge">${ownedCount}/${total}</span>` : ""}
+          </div>
+          <div class="card-title">
+            <div class="set-name">
+              ${escapeHtml(s.name)}
+              <span class="attr-tag">${escapeHtml(s.attribute || '')}</span>
+            </div>
+            <div class="set-meta">
+              ${starsOf(s.star)}
+              ${(s.obtain || "") === "限时追光" && s.gacha
+                ? `<br><span class="gacha-link" data-gacha="${escapeHtml(s.gacha)}" title="点击查看该卡池全部套装">${escapeHtml(s.gacha)} <b class="gacha-arrow">></b></span>`
+                : (s.gacha ? '<br><span class="gacha-label">' + escapeHtml(s.gacha) + '</span>' : '')}
+            </div>
+            ${(s.obtain || "") === "兑换商铺"
+              ? `<input class="obtain-edit" value="${escapeHtml(s.obtain || '')}" placeholder="填来源" data-setid="${s.id}">`
+              : `<div class="obtain-readonly">来源：${escapeHtml(s.obtain || '未知')}</div>`}
+            ${aliasHtml}
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width:${pct}%"></div>
+          </div>
+          <div class="progress-text clickable" data-setid="${s.id}" title="查看部件">
+            已拥有 ${ownedCount} / ${total} 部件 <span class="progress-arrow">›</span>
+          </div>
+        </div>
+      </div>`;
+  }).join("");
+
+  grid.querySelectorAll(".card").forEach(card => {
+    card.addEventListener("click", () => openDetail(parseInt(card.dataset.setid, 10)));
+  });
+  // 限时追光卡池名：点击打开同卡池全部套装弹窗
+  grid.querySelectorAll(".gacha-link").forEach(link => {
+    link.addEventListener("click", e => {
+      e.stopPropagation();
+      openGacha(link.dataset.gacha);
+    });
+  });
+  grid.querySelectorAll(".thumb").forEach(img => {
+    img.addEventListener("click", e => {
+      e.stopPropagation();
+      openBigImage(img.dataset.full);
+    });
+  });
+  grid.querySelectorAll(".alias-edit").forEach(inp => {
+    inp.addEventListener("click", e => e.stopPropagation());
+    inp.addEventListener("change", () => saveAlias(inp));
+    inp.addEventListener("keydown", e => {
+      if (e.key === "Enter") { e.preventDefault(); saveAlias(inp); inp.blur(); }
+      else if (e.key === "Escape") { inp.value = inp.defaultValue; inp.blur(); }
+    });
+  });
+  grid.querySelectorAll(".obtain-edit").forEach(inp => {
+    inp.addEventListener("click", e => e.stopPropagation());
+    inp.addEventListener("change", () => saveObtain(inp));
+    inp.addEventListener("keydown", e => {
+      if (e.key === "Enter") { e.preventDefault(); saveObtain(inp); inp.blur(); }
+      else if (e.key === "Escape") { inp.value = inp.defaultValue; inp.blur(); }
+    });
+  });
+  // 「已拥有 X/Y 部件」行：点击打开部件详情弹窗
+  grid.querySelectorAll(".progress-text.clickable").forEach(pt => {
+    pt.addEventListener("click", e => {
+      e.stopPropagation();
+      openDetail(parseInt(pt.dataset.setid, 10));
+    });
+  });
+
+  renderPagination(totalPages);
+}
+
+// 散件渲染：每个散件一个卡片，独立部件
+function renderLoose() {
+  const list = getFilteredLoose();
+  const grid = $("grid");
+  const totalPages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+  if (currentPage > totalPages) currentPage = totalPages;
+  if (currentPage < 1) currentPage = 1;
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const pageItems = list.slice(start, start + PAGE_SIZE);
+
+  $("result-count").textContent = `共 ${list.length} 个散件，第 ${currentPage}/${totalPages} 页`;
+  if (list.length === 0) {
+    grid.innerHTML = "";
+    $("empty").style.display = "block";
+    $("pagination").innerHTML = "";
+    return;
+  }
+  $("empty").style.display = "none";
+
+  grid.innerHTML = pageItems.map(it => {
+    const owned = it.owned ? "all-owned" : "";
+    return `
+      <div class="card ${owned}" data-itemid="${it.id}">
+        <div class="card-head">
+          <div class="preview-wrap">
+            <img class="thumb lazy-img" loading="lazy" decoding="async" src="${escapeHtml(it.image || '')}" alt="${escapeHtml(it.name)}" onerror="this.style.visibility='hidden'" data-full="${escapeHtml(it.image_big || it.image || '')}" data-name="${escapeHtml(it.name || '')}" data-forms='${escapeHtml(JSON.stringify(it.forms || []))}'>
+            ${it.owned ? '<span class="owned-badge">已拥有</span>' : ""}
+            ${(it.forms || []).length > 1 ? `<span class="f-badge" title="有 ${(it.forms || []).length} 个形态，点击查看">×${(it.forms || []).length} 形态</span>` : ""}
+          </div>
+          <div class="card-title">
+            <div class="set-name">
+              ${escapeHtml(it.name)}
+              <span class="attr-tag">${escapeHtml(it.type || '散件')}</span>
+            </div>
+            <div class="set-meta">
+              ${starsOf(it.star)}
+              ${it.attribute ? ' · ' + escapeHtml(it.attribute) : ''}
+              ${it.version ? '<br>v' + escapeHtml(it.version) : ''}
+            </div>
+            ${it.obtain ? `<div class="source-tag">${escapeHtml(it.obtain)}</div>` : ""}
+          </div>
+        </div>
+      </div>`;
+  }).join("");
+
+  // 点击卡片切换 owned（散件直接标记）
+  grid.querySelectorAll(".card").forEach(card => {
+    card.addEventListener("click", () => {
+      const itemId = parseInt(card.dataset.itemid, 10);
+      const it = ALL_LOOSE.find(x => x.id === itemId);
+      if (!it) return;
+      toggleLooseOwned(it);
+    });
+  });
+  grid.querySelectorAll(".thumb").forEach(img => {
+    img.addEventListener("click", e => {
+      e.stopPropagation();
+      openThumbImage(img);
+    });
+  });
+  grid.querySelectorAll(".f-badge").forEach(b => {
+    b.addEventListener("click", e => {
+      e.stopPropagation();
+      const img = b.parentNode.querySelector("img.thumb");
+      if (img) openThumbImage(img);
+    });
+  });
+
+  renderPagination(totalPages);
+}
+
+// 切换散件 owned 状态
+async function toggleLooseOwned(it) {
+  const next = it.owned ? 0 : 1;
+  await fetch("/api/owned", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ item_id: it.id, owned: next })
+  });
+  it.owned = next;
+  render();
+  loadStats();
+  return next;
+}
+
+function renderPagination(totalPages) {
+  const pg = $("pagination");
+  if (totalPages <= 1) { pg.innerHTML = ""; return; }
+  let html = `<button class="page-btn" data-p="${currentPage - 1}" ${currentPage === 1 ? "disabled" : ""}>‹</button>`;
+  let startP = Math.max(1, currentPage - 2);
+  let endP = Math.min(totalPages, currentPage + 2);
+  if (startP > 1) html += `<button class="page-btn" data-p="1">1</button>`;
+  if (startP > 2) html += `<span class="page-info">…</span>`;
+  for (let p = startP; p <= endP; p++) {
+    html += `<button class="page-btn ${p === currentPage ? "active" : ""}" data-p="${p}">${p}</button>`;
+  }
+  if (endP < totalPages - 1) html += `<span class="page-info">…</span>`;
+  if (endP < totalPages) html += `<button class="page-btn" data-p="${totalPages}">${totalPages}</button>`;
+  html += `<button class="page-btn" data-p="${currentPage + 1}" ${currentPage === totalPages ? "disabled" : ""}>›</button>`;
+  pg.innerHTML = html;
+
+  pg.querySelectorAll(".page-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      if (btn.disabled) return;
+      const p = parseInt(btn.dataset.p, 10);
+      if (!isNaN(p) && p >= 1 && p <= totalPages) {
+        currentPage = p;
+        render();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    });
+  });
+}
+
+// ---- 大图预览 + 多形态左右切换（outfit_item_forms） ----
+// FORM_VIEW 非空且 forms>1 时启用左右切换：箭头 / 键盘 ←→ / 点击图片左、右半区
+let FORM_VIEW = null;
+
+function openBigImage(src) {
+  if (!src) return;
+  FORM_VIEW = null;
+  $("img-big").src = src;
+  renderFormView();
+  $("img-mask").classList.add("show");
+}
+
+// thumb/角标点击：多形态 → 大图预览可左右切换；单形态 → 普通大图
+function openThumbImage(img) {
+  if (!img) return;
+  let forms = [];
+  try { const f = JSON.parse(img.dataset.forms || "[]"); forms = Array.isArray(f) ? f : []; } catch (e) {}
+  if (forms.length > 0) { openForms(img.dataset.name || "", forms); return; }
+  openBigImage(img.dataset.full);
+}
+
+function openForms(name, forms) {
+  if (!forms || !forms.length) return;
+  if (forms.length === 1) { openBigImage(forms[0].image_big || forms[0].image); return; }
+  FORM_VIEW = { name: name || "", forms: forms, idx: 0 };
+  renderFormView();
+  $("img-mask").classList.add("show");
+}
+
+function renderFormView() {
+  const multi = !!(FORM_VIEW && FORM_VIEW.forms.length > 1);
+  if (FORM_VIEW) {
+    const f = FORM_VIEW.forms[FORM_VIEW.idx];
+    $("img-big").src = f.image_big || f.image || "";
+  }
+  $("img-prev").classList.toggle("show", multi);
+  $("img-next").classList.toggle("show", multi);
+  const counter = $("img-counter");
+  counter.classList.toggle("show", multi);
+  if (multi) {
+    counter.textContent = (FORM_VIEW.name ? FORM_VIEW.name + " · " : "") +
+      "形态 " + (FORM_VIEW.idx + 1) + "/" + FORM_VIEW.forms.length;
+  }
+  $("img-big").style.cursor = multi ? "pointer" : "default";
+}
+
+function stepForm(delta) {
+  if (!FORM_VIEW || FORM_VIEW.forms.length < 2) return;
+  const n = FORM_VIEW.forms.length;
+  FORM_VIEW.idx = (FORM_VIEW.idx + delta + n) % n;
+  renderFormView();
+}
+
+function closeBigImage() {
+  $("img-mask").classList.remove("show");
+  $("img-big").src = "";
+  FORM_VIEW = null;
+  renderFormView();
+}
+
+(function () {
+  const mask = $("img-mask");
+  if (!mask) return;
+  $("img-prev").addEventListener("click", (e) => { e.stopPropagation(); stepForm(-1); });
+  $("img-next").addEventListener("click", (e) => { e.stopPropagation(); stepForm(1); });
+  $("img-counter").addEventListener("click", (e) => e.stopPropagation());
+  // 点击大图左半区 → 上一个形态；右半区 → 下一个形态
+  $("img-big").addEventListener("click", (e) => {
+    e.stopPropagation();
+    const r = $("img-big").getBoundingClientRect();
+    stepForm(e.clientX < r.left + r.width / 2 ? -1 : 1);
+  });
+  document.addEventListener("keydown", (e) => {
+    if (!mask.classList.contains("show")) return;
+    if (e.key === "Escape") closeBigImage();
+    else if (e.key === "ArrowLeft") { e.preventDefault(); stepForm(-1); }
+    else if (e.key === "ArrowRight") { e.preventDefault(); stepForm(1); }
+  });
+})();
+
+// ---- 最近拥有（owned_log）：工具栏「最近拥有」按钮 ----
+const OL_SOURCE_TEXT = { manual: "手动", recognize: "识别", crawl_set: "爬虫", reset: "清空" };
+function fillOlTypeSelect() {
+  const sel = $("ol-type");
+  if (sel.dataset.filled === "1") return;
+  const types = [...new Set([...ALL_SETS.flatMap(s => s.items.map(i => i.type)),
+                             ...ALL_LOOSE.map(i => i.type)].filter(Boolean))];
+  const ordered = [...TYPE_ORDER.filter(t => types.includes(t)),
+                   ...types.filter(t => !TYPE_ORDER.includes(t)).sort()];
+  for (const t of ordered) sel.insertAdjacentHTML("beforeend", `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`);
+  sel.dataset.filled = "1";
+}
+async function loadOwnedLog() {
+  const type = $("ol-type").value || "";
+  const limit = $("ol-limit").value || "20";
+  const q = new URLSearchParams({ limit });
+  if (type) q.set("type", type);
+  const res = await fetch("/api/owned/log?" + q.toString());
+  const data = await res.json();
+  const list = $("ol-list");
+  const items = data.items || [];
+  if (!items.length) {
+    list.innerHTML = '<div style="font-size:13px;color:var(--muted);padding:10px 2px;">暂无记录（该部位可能还没有写入过 owned 日志）</div>';
+    return;
+  }
+  list.innerHTML = items.map(r => {
+    if (!r.id) {  // 批量操作（如 reset）
+      return `<div class="ol-row off"><div class="ol-main"><div class="ol-name">${OL_SOURCE_TEXT[r.source] || r.source} · 批量操作</div>
+        <div class="ol-meta">item_id 为空（整表）</div></div><div class="ol-time">${escapeHtml(r.created_at)}</div></div>`;
+    }
+    const meta = [r.star ? r.star + "星" : "", r.type || "", r.attribute || "", r.set_name || "散件"]
+      .filter(Boolean).join(" · ");
+    return `<div class="ol-row ${r.owned ? "" : "off"}" data-itemid="${r.id}">
+      <img src="${escapeHtml(r.image || "")}" loading="lazy" onerror="this.style.visibility='hidden'" alt="">
+      <div class="ol-main">
+        <div class="ol-name">${escapeHtml(r.name || "")} ${r.owned ? "" : '<span style="font-size:11px;color:#b91c1c;">（取消拥有）</span>'}</div>
+        <div class="ol-meta">${escapeHtml(meta)} · ${escapeHtml(OL_SOURCE_TEXT[r.source] || r.source)}</div>
+      </div>
+      <div class="ol-time">${escapeHtml(r.created_at)}</div>
+    </div>`;
+  }).join("");
+  // 点击跳到所属套装详情（散件则跳首页散件视图并搜索该部件名）
+  list.querySelectorAll(".ol-row[data-itemid]").forEach(row => {
+    row.addEventListener("click", () => {
+      const id = parseInt(row.dataset.itemid, 10);
+      const inSet = ALL_SETS.find(s => s.items.some(i => i.id === id));
+      closeOwnedLog();
+      if (inSet) { window.location.href = `/set/${inSet.id}`; return; }
+      const it = ALL_LOOSE.find(i => i.id === id);
+      const nm = row.querySelector(".ol-name").textContent.trim();
+      viewMode = "loose"; filters.search = nm || ""; currentPage = 1;
+      saveState(); render();
+    });
+  });
+}
+function openOwnedLog() {
+  fillOlTypeSelect();
+  $("ol-mask").classList.add("show");
+  loadOwnedLog();
+}
+function closeOwnedLog() { $("ol-mask").classList.remove("show"); }
+(function () {
+  const btn = $("btn-owned-log");
+  if (btn) btn.addEventListener("click", e => { e.stopPropagation(); openOwnedLog(); });
+  const close = $("ol-close");
+  if (close) close.addEventListener("click", closeOwnedLog);
+  const mask = $("ol-mask");
+  if (mask) mask.addEventListener("click", e => { if (e.target === mask) closeOwnedLog(); });
+  const t = $("ol-type"), l = $("ol-limit");
+  if (t) t.addEventListener("change", loadOwnedLog);
+  if (l) l.addEventListener("change", loadOwnedLog);
+})();
+
+// 卡池弹窗：展示同 gacha（限时追光卡池）下的全部套装
+function openGacha(gacha) {
+  if (!gacha) return;
+  const sets = ALL_SETS.filter(s => s.gacha === gacha);
+  if (sets.length === 0) return;
+
+  // 仅「5/6星限时追光」卡池才展示散件（其他卡池保持只显示套装）
+  const isLimitedHigh = sets.some(s =>
+    s.obtain === OBTAIN_LIMITED && (s.star === "5" || s.star === "6")
+  );
+  const loose = isLimitedHigh
+    ? ALL_LOOSE.filter(i => (i.obtain || "").includes(gacha))
+    : [];
+
+  $("gacha-title").textContent = isLimitedHigh
+    ? `卡池「${gacha}」全部内容（套装 ${sets.length} + 散件 ${loose.length}）`
+    : `卡池「${gacha}」全部套装（${sets.length}）`;
+
+  let html = "";
+  // 套装卡片
+  html += sets.map(s => {
+    const ownedCount = s.items.filter(i => i.owned).length;
+    const total = s.items.length;
+    return `
+      <div class="gacha-set-card" data-setid="${s.id}">
+        <img loading="lazy" decoding="async" src="${escapeHtml(s.preview || '')}" onerror="this.style.visibility='hidden'" alt="${escapeHtml(s.name)}">
+        <div class="g-name">${escapeHtml(s.name)}</div>
+        <div class="g-meta">${starsOf(s.star)} ${escapeHtml(s.attribute || '')}</div>
+        <div class="g-meta">部件 ${ownedCount}/${total}</div>
+      </div>`;
+  }).join("");
+  // 散件卡片
+  html += loose.map(i => {
+    const owned = i.owned ? "owned" : "";
+    return `
+      <div class="gacha-set-card loose-card ${owned}" data-itemid="${i.id}">
+        <img loading="lazy" decoding="async" src="${escapeHtml(i.image || '')}" onerror="this.style.visibility='hidden'" alt="${escapeHtml(i.name)}">
+        <div class="g-name">${escapeHtml(i.name)}</div>
+        <div class="g-meta">${escapeHtml(i.type || '散件')} · ${starsOf(i.star)}</div>
+        <div class="g-meta">${i.owned ? '✓ 已拥有' : '未拥有'}</div>
+      </div>`;
+  }).join("");
+
+  $("gacha-sets").innerHTML = html;
+
+  // 套装卡片：点击打开详情
+  $("gacha-sets").querySelectorAll(".gacha-set-card[data-setid]").forEach(card => {
+    card.addEventListener("click", () => {
+      $("gacha-mask").classList.remove("show");
+      openDetail(parseInt(card.dataset.setid, 10));
+    });
+  });
+  // 散件卡片：点击切换 owned
+  $("gacha-sets").querySelectorAll(".gacha-set-card[data-itemid]").forEach(card => {
+    card.addEventListener("click", async () => {
+      const itemId = parseInt(card.dataset.itemid, 10);
+      const it = ALL_LOOSE.find(x => x.id === itemId);
+      if (!it) return;
+      const next = await toggleLooseOwned(it);
+      // 更新卡片状态（使用切换后的新值，避免与异步请求竞态）
+      card.classList.toggle("owned", !!next);
+      const meta = card.querySelectorAll(".g-meta");
+      if (meta.length >= 2) meta[1].textContent = next ? "✓ 已拥有" : "未拥有";
+    });
+  });
+
+  $("gacha-mask").classList.add("show");
+}
+
+function openDetail(setId) {
+  // 套装详情改为独立页面
+  window.location.href = `/set/${setId}`;
+  return;
+  const s = ALL_SETS.find(x => x.id === setId);
+  if (!s) return;
+
+  const ownedCount = s.items.filter(i => i.owned).length;
+  const total = s.items.length;
+
+  $("detail-head").innerHTML = `
+    <img class="detail-preview" src="${escapeHtml(s.preview || '')}" onerror="this.style.visibility='hidden'" data-full="${escapeHtml(s.preview || '')}" title="查看套装大图">
+    <div class="detail-info">
+      <div class="set-name">${escapeHtml(s.name)} <span class="attr-tag">${escapeHtml(s.attribute || '')}</span></div>
+      <div class="set-meta">
+        ${starsOf(s.star)}
+        ${s.obtain ? ' · ' + escapeHtml(s.obtain) : ''}
+        ${(s.obtain === "限时追光" && s.gacha)
+          ? `<br><span class="gacha-link" data-gacha="${escapeHtml(s.gacha)}" title="点击查看该卡池全部套装">${escapeHtml(s.gacha)} <b class="gacha-arrow">></b></span>`
+          : (s.gacha ? '<br><span class="gacha-label">' + escapeHtml(s.gacha) + '</span>' : '')}
+      </div>
+      <div class="detail-count">部件 <span class="owned-num">${ownedCount}/${total}</span></div>
+    </div>`;
+
+  const gachaLink = $("detail-head").querySelector(".gacha-link");
+  if (gachaLink) gachaLink.addEventListener("click", () => openGacha(gachaLink.dataset.gacha));
+
+  const dp = $("detail-head").querySelector(".detail-preview");
+  if (dp) dp.addEventListener("click", () => openBigImage(dp.dataset.full));
+
+  $("detail-items").innerHTML = s.items.map(i => {
+    const owned = i.owned ? "owned" : "";
+    const checked = i.owned ? "checked" : "";
+    const thumb = i.image || '';
+    const full = i.image_big || i.image || '';
+    return `
+      <div class="part-cell ${owned}" data-itemid="${i.id}">
+        <img class="part-cell-img lazy-img" loading="lazy" decoding="async" src="${escapeHtml(thumb)}" onerror="this.style.visibility='hidden'" data-full="${escapeHtml(full)}" alt="${escapeHtml(i.name)}" title="查看部件大图">
+        <div class="part-cell-info">
+          <div class="part-cell-name">${escapeHtml(i.name)}</div>
+          <div class="part-cell-type">${escapeHtml(i.type || '')}</div>
+        </div>
+        <label class="part-cell-check" title="标记为已有">
+          <input type="checkbox" ${checked}>
+        </label>
+        <button class="part-heart-btn" data-itemid="${i.id}" data-name="${escapeHtml(i.name)}" title="收藏到心愿单" style="position:absolute; top:6px; right:6px; border:none; background:rgba(255,255,255,.85); border-radius:50%; width:26px; height:26px; font-size:15px; cursor:pointer; line-height:1;">☆</button>
+      </div>`;
+  }).join("");
+
+  $("detail-items").querySelectorAll(".part-cell").forEach(cell => {
+    // 点击部件图 → 查看大图
+    const img = cell.querySelector(".part-cell-img");
+    if (img && img.dataset.full) {
+      img.addEventListener("click", () => openBigImage(img.dataset.full));
+    }
+    // 仅 checkbox 切换 owned
+    const cb = cell.querySelector(".part-cell-check input");
+    cb.addEventListener("change", () => togglePartCell(cell, setId));
+    // 心标按钮
+    const heart = cell.querySelector(".part-heart-btn");
+    if (heart) heart.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const itemId = parseInt(heart.dataset.itemid, 10);
+      const res = await fetch("/api/wishlist/toggle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ item_id: itemId })
+      });
+      const data = await res.json();
+      heart.textContent = data.in_wishlist ? "★" : "☆";
+      heart.style.color = data.in_wishlist ? "#e67e22" : "";
+    });
+  });
+
+  $("detail-mask").classList.add("show");
+}
+
+// 弹窗内部件网格：手动标记 owned（用 item 行切换逻辑）
+async function togglePartCell(cell, setId) {
+  const itemId = parseInt(cell.dataset.itemid, 10);
+  const isOwned = cell.classList.contains("owned");
+  const next = isOwned ? 0 : 1;
+  await fetch("/api/owned", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ item_id: itemId, owned: next })
+  });
+  for (const s of ALL_SETS) {
+    const it = s.items.find(i => i.id === itemId);
+    if (it) { it.owned = next; break; }
+  }
+  render();
+  loadStats();
+  if (setId) openDetail(setId);
+}
+
+async function saveAlias(inp) {
+  const setId = parseInt(inp.dataset.setid, 10);
+  const alias = inp.value.trim();
+  inp.classList.remove("saved", "failed");
+  inp.classList.add("saving");
+  try {
+    const res = await fetch("/api/alias", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ set_id: setId, alias })
+    });
+    if (!res.ok) throw new Error(res.status);
+    const s = ALL_SETS.find(x => x.id === setId);
+    if (s) s.alias = alias || null;
+    inp.classList.remove("saving");
+    inp.classList.add("saved");
+    setTimeout(() => inp.classList.remove("saved"), 1500);
+  } catch (e) {
+    inp.classList.remove("saving");
+    inp.classList.add("failed");
+    setTimeout(() => inp.classList.remove("failed"), 2000);
+  }
+}
+
+async function saveObtain(inp) {
+  const setId = parseInt(inp.dataset.setid, 10);
+  const obtain = inp.value.trim();
+  inp.classList.remove("saved", "failed");
+  inp.classList.add("saving");
+  try {
+    const res = await fetch("/api/obtain", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ set_id: setId, obtain })
+    });
+    if (!res.ok) throw new Error(res.status);
+    const s = ALL_SETS.find(x => x.id === setId);
+    if (s) s.obtain = obtain || null;
+    inp.classList.remove("saving");
+    inp.classList.add("saved");
+    setTimeout(() => inp.classList.remove("saved"), 1500);
+  } catch (e) {
+    inp.classList.remove("saving");
+    inp.classList.add("failed");
+    setTimeout(() => inp.classList.remove("failed"), 2000);
+  }
+}
+
+async function loadStats() {
+  const res = await fetch("/api/stats");
+  const d = await res.json();
+  $("st-set").textContent = d.set;
+  $("st-item").textContent = d.item;
+  $("st-owned").textContent = d.owned;
+  $("st-owned-set").textContent = d.owned_set;
+}
+
+// ---- 筛选事件 ----
+// 套装/散件分组切换
+$("group-tab").addEventListener("click", e => {
+  const crumb = e.target.closest(".crumb");
+  if (!crumb) return;
+  viewMode = crumb.dataset.view || "set";
+  // 切回套装视图时，若当前星级在套装中不存在（如 3 星/未知），重置为全部，避免组合搜索为空
+  if (viewMode === "set" && filters.star && !starHasSets(filters.star)) {
+    filters.star = "";
+    document.querySelectorAll("#breadcrumb .crumb").forEach(c => c.classList.remove("active"));
+    document.querySelector('#breadcrumb .crumb[data-star=""]').classList.add("active");
+  }
+  // 来源选项随视图切换刷新（套装/散件来源不同，无效来源会被自动重置）
+  fillObtainSelect();
+  document.querySelectorAll("#group-tab .crumb").forEach(c => c.classList.remove("active"));
+  crumb.classList.add("active");
+  currentPage = 1;
+  render();
+});
+$("breadcrumb").addEventListener("click", e => {
+  const crumb = e.target.closest(".crumb");
+  if (!crumb) return;
+  filters.star = crumb.dataset.star || "";
+  // 星级切换后，若之前选的来源是限时子项（非5星tab不再显示），重置来源
+  if (filters.star !== "5" && [OBTAIN_LIMITED_5, OBTAIN_LIMITED_6, OBTAIN_LIMITED_BOX].includes(filters.obtain)) {
+    filters.obtain = "";
+  }
+  // 套装视图下该星级无套装（如 3 星/未知，仅散件有）时，自动切到散件视图，避免空结果
+  if (viewMode === "set" && filters.star && !starHasSets(filters.star)) {
+    viewMode = "loose";
+    document.querySelectorAll("#group-tab .crumb").forEach(c => c.classList.toggle("active", c.dataset.view === viewMode));
+  }
+  fillObtainSelect();
+  document.querySelectorAll("#breadcrumb .crumb").forEach(c => c.classList.remove("active"));
+  crumb.classList.add("active");
+  currentPage = 1;
+  render();
+});
+$("f-attr").addEventListener("change", e => { filters.attr = e.target.value; render(); });
+$("f-type").addEventListener("change", e => { filters.type = e.target.value; render(); });
+$("f-owned").addEventListener("change", e => { filters.owned = e.target.value; render(); });
+$("f-obtain").addEventListener("change", e => { filters.obtain = e.target.value; render(); });
+$("btn-search").addEventListener("click", () => { currentPage = 1; render(); });
+$("f-search").addEventListener("input", e => {
+  filters.search = e.target.value.trim();
+  currentPage = 1;
+  render();
+});
+$("f-search").addEventListener("keydown", e => { if (e.key === "Enter") { currentPage = 1; render(); } });
+$("btn-clear").addEventListener("click", () => {
+  filters = { star: "", attr: "", type: "", owned: "", obtain: "", search: "" };
+  $("f-attr").value = $("f-type").value = $("f-owned").value = $("f-obtain").value = "";
+  $("f-search").value = "";
+  document.querySelectorAll("#breadcrumb .crumb").forEach(c => c.classList.remove("active"));
+  document.querySelector('#breadcrumb .crumb[data-star=""]').classList.add("active");
+  currentPage = 1;
+  render();
+});
+
+// 点击遮罩空白处关闭大图（多形态时一并清掉切换状态）
+$("img-mask").addEventListener("click", (e) => {
+  if (e.target === $("img-mask")) closeBigImage();
+});
+
+// ---- 上传截图弹窗 ----
+const mask = $("modal-mask");
+const dropZone = $("drop-zone");
+const fileInput = $("file-input");
+
+function openModal() {
+  $("result-box").innerHTML = "";
+  $("modal-title").textContent = "上传截图识别部件（限定部位）";
+  $("drop-hint").innerHTML = `点击选择或拖拽截图到此处<br>
+    <small>支持 jpg / png / webp；请先选部位，再上传该部位的截图识别</small>`;
+  fileInput.accept = "image/*";
+  $("type-filter-wrap").style.display = "block";
+  // 重置
+  $("file-picked").style.display = "none";
+  $("file-picked").textContent = "";
+  $("btn-start").style.display = "none";
+  $("btn-close").style.display = "none";
+  $("upload-type").value = "";
+  mask.classList.add("show");
+}
+
+$("btn-upload").addEventListener("click", openModal);
+
+function closeModal() { mask.classList.remove("show"); }
+$("btn-close").addEventListener("click", closeModal);
+mask.addEventListener("click", e => { if (e.target === mask) closeModal(); });
+
+dropZone.addEventListener("click", () => fileInput.click());
+dropZone.addEventListener("dragover", e => { e.preventDefault(); dropZone.classList.add("dragover"); });
+dropZone.addEventListener("dragleave", () => dropZone.classList.remove("dragover"));
+dropZone.addEventListener("drop", e => {
+  e.preventDefault();
+  dropZone.classList.remove("dragover");
+  handleFiles(e.dataTransfer.files);
+});
+fileInput.addEventListener("change", e => handleFiles(e.target.files));
+
+function handleFiles(files) {
+  if (!files || files.length === 0) return;
+  const type = $("upload-type").value;
+  if (!type) {
+    alert("请先选择「限定部位」（如翅膀、鞋子、连衣裙等）");
+    fileInput.value = "";
+    return;
+  }
+  const names = Array.from(files).map(f => f.name).join("、");
+  $("file-picked").style.display = "block";
+  $("file-picked").textContent = `已选择 ${files.length} 个文件：${names}`;
+  $("btn-start").style.display = "inline-block";
+}
+
+$("btn-start").addEventListener("click", async () => {
+  const files = fileInput.files;
+  if (!files || files.length === 0) return;
+  const type = $("upload-type").value;
+  if (!type) { alert("请先选择部位"); return; }
+
+  $("btn-start").disabled = true;
+  $("result-box").innerHTML = "<div class='item'>正在识别…</div>";
+
+  const fd = new FormData();
+  for (const f of files) fd.append("file", f);
+  fd.append("type", type);
+
+  try {
+    const res = await fetch("/api/upload", { method: "POST", body: fd });
+    const data = await res.json();
+    if (data.error) {
+      $("result-box").innerHTML = `<div class='item'>错误：${escapeHtml(data.error)}</div>`;
+    } else {
+      const matched = data.matched || [];
+      const unmatched = data.unmatched || [];
+      const missed = data.missed_owned || [];
+      let html = `<div class='item'><strong>识别部件：</strong>${matched.length} 个匹配，${unmatched.length} 个未匹配</div>`;
+      if (matched.length) {
+        html += `<div class='item' style='margin-top:6px;'><strong>本次截图识别并已标记：</strong></div>`;
+        matched.slice(0, 20).forEach(m => {
+          html += `<div class='item'>✓ ${escapeHtml(m.name)} <span style='color:var(--muted)'>(${escapeHtml(m.type)})</span></div>`;
+        });
+      }
+      if (unmatched.length) {
+        html += `<div class='item' style='margin-top:6px;'><strong>未匹配（需手动确认）：</strong></div>`;
+        unmatched.slice(0, 20).forEach(u => {
+          html += `<div class='item' style='color:var(--muted)'>? ${escapeHtml(u)}</div>`;
+        });
+      }
+      if (missed.length) {
+        html += `<div class='item' style='margin-top:8px;'><strong style='color:#b0432f'>⚠️ 该部位之前已标记、但本次截图未识别到（${missed.length} 个，可能是误标，请确认是否删除）：</strong></div>`;
+        missed.slice(0, 30).forEach(m => {
+          html += `<div class='item' style='color:#b0432f' data-missed="${m.item_id}">✗ ${escapeHtml(m.name)} <span style='color:var(--muted)'>(${escapeHtml(m.type)} · ${escapeHtml(m.set)})</span></div>`;
+        });
+      }
+      $("result-box").innerHTML = html;
+      $("btn-close").style.display = "inline-block";
+      render();
+      loadStats();
+    }
+  } catch (e) {
+    $("result-box").innerHTML = `<div class='item'>请求失败：${escapeHtml(String(e))}</div>`;
+  } finally {
+    $("btn-start").disabled = false;
+    fileInput.value = "";
+  }
+});
+
+// 详情弹窗关闭：点击遮罩关闭（无关闭按钮）
+$("detail-mask").addEventListener("click", e => { if (e.target === $("detail-mask")) $("detail-mask").classList.remove("show"); });
+
+// 卡池弹窗关闭：点击遮罩关闭（无关闭按钮）
+$("gacha-mask").addEventListener("click", e => { if (e.target === $("gacha-mask")) $("gacha-mask").classList.remove("show"); });
+
+render = render;
+
+// ===== AI 识别匹配 =====
+const aiMask = $("ai-match-mask");
+const aiDropZone = $("ai-drop-zone");
+const aiFileInput = $("ai-file-input");
+
+$("btn-ai-match").addEventListener("click", () => {
+  window.location.href = "/recognize";
+  return;
+  $("ai-result").innerHTML = "";
+  $("ai-btn-close").style.display = "none";
+  $("ai-file-picked").style.display = "none";
+  $("ai-btn-start").style.display = "none";
+  aiFileInput.value = "";
+  // 填充部位下拉
+  const typeSel = $("ai-type-select");
+  typeSel.innerHTML = `<option value="">请选择部位</option>` +
+    TYPE_ORDER.filter(t => t).map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join("");
+  aiMask.classList.add("show");
+});
+$("ai-btn-close").addEventListener("click", () => aiMask.classList.remove("show"));
+$("ai-btn-log").addEventListener("click", async () => {
+  // 查看识别日志
+  try {
+    const res = await fetch("/api/recognize/log?n=50");
+    const data = await res.json();
+    const logs = data.logs || [];
+    let html = `<h3 style="margin-bottom:10px;">识别日志（最近 ${logs.length} 条）</h3>`;
+    if (logs.length === 0) {
+      html += `<div style="color:var(--muted); padding:12px;">暂无识别记录</div>`;
+    } else {
+      html += `<div style="max-height:50vh; overflow-y:auto; display:flex; flex-direction:column; gap:6px;">`;
+      logs.forEach(l => {
+        html += `<div style="border:1px solid var(--border); border-radius:8px; padding:8px 10px; background:#fff; font-size:12px;">
+          <div style="font-weight:600;">${escapeHtml(l.time||'')} · ${escapeHtml(l.types||'')} · ${escapeHtml(l.mode||'')} · ${l.elapsed??'?'}s</div>
+          <div style="color:var(--muted);">top1: ${escapeHtml(l.top1||'无')}</div>
+          ${l.crop_file ? `<div style="color:var(--muted);">裁剪图: <a href="/uploads/${escapeHtml(l.crop_file)}" target="_blank" style="color:var(--primary);">查看</a></div>` : ''}
+        </div>`;
+      });
+      html += `</div>`;
+    }
+    $("ai-result").innerHTML = html;
+  } catch (e) {
+    $("ai-result").innerHTML = `<div style="color:#c0392b; padding:12px;">日志加载失败：${escapeHtml(String(e))}</div>`;
+  }
+});
+aiMask.addEventListener("click", e => { if (e.target === aiMask) aiMask.classList.remove("show"); });
+
+aiDropZone.addEventListener("click", () => aiFileInput.click());
+aiDropZone.addEventListener("dragover", e => { e.preventDefault(); aiDropZone.classList.add("dragover"); });
+aiDropZone.addEventListener("dragleave", () => aiDropZone.classList.remove("dragover"));
+aiDropZone.addEventListener("drop", e => {
+  e.preventDefault();
+  aiDropZone.classList.remove("dragover");
+  aiHandleFiles(e.dataTransfer.files);
+});
+aiFileInput.addEventListener("change", e => aiHandleFiles(e.target.files));
+
+function aiHandleFiles(files) {
+  if (!files || files.length === 0) return;
+  const f = files[0];
+  $("ai-file-picked").style.display = "block";
+  $("ai-file-picked").textContent = `已选择：${f.name}（${(f.size / 1024).toFixed(0)} KB）`;
+  $("ai-btn-start").style.display = "inline-block";
+}
+
+$("ai-btn-start").addEventListener("click", async () => {
+  const f = aiFileInput.files[0];
+  if (!f) return;
+  const types = $("ai-type-select").value;
+  if (!types) { alert("请先选择部位"); return; }
+  $("ai-btn-start").disabled = true;
+  const mode = document.querySelector("input[name='ai-mode']:checked")?.value || "coarse";
+  const modeLabel = mode === "coarse" ? "粗排" : "精排";
+  $("ai-result").innerHTML = `<div style='padding:12px; color:var(--muted);'>正在识别（${modeLabel}）…</div>`;
+
+  const fd = new FormData();
+  fd.append("file", f);
+  fd.append("types", types);
+  fd.append("mode", mode);
+
+  try {
+    const res = await fetch("/api/recognize", { method: "POST", body: fd });
+    const data = await res.json();
+    if (data.error) {
+      $("ai-result").innerHTML = `<div style='padding:12px; color:#c0392b;'>错误：${escapeHtml(data.error)}</div>`;
+    } else {
+      renderAiResult(data, mode);
+      $("ai-btn-close").style.display = "inline-block";
+      $("ai-btn-log").style.display = "inline-block";
+    }
+  } catch (e) {
+    $("ai-result").innerHTML = `<div style='padding:12px; color:#c0392b;'>请求失败：${escapeHtml(String(e))}</div>`;
+  } finally {
+    $("ai-btn-start").disabled = false;
+    aiFileInput.value = "";
+  }
+});
+
+function renderAiResult(data, mode) {
+  const coarse = data.coarse || [];
+  const precise = data.precise;
+  const cropFile = data.crop_file;
+  if (coarse.length === 0) {
+    $("ai-result").innerHTML = "<div style='padding:12px; color:var(--muted);'>未识别到部件</div>";
+    return;
+  }
+  const topN = coarse.slice(0, mode === "coarse" ? 5 : 10);
+
+  let html = `<div style='font-size:12px; color:var(--muted); margin-bottom:8px;'>耗时 ${data.elapsed ?? '?'}s`;
+  if (cropFile) html += ` · <a href="/uploads/${escapeHtml(cropFile)}" target="_blank" style="color:var(--primary);">裁剪图</a>`;
+  html += `</div>`;
+
+  if (mode === "precise") {
+    html += `<div style="font-size:13px; font-weight:700; margin-bottom:8px; color:#2e7d32;">精排命中：${(precise && precise.length) ? precise.map(p => escapeHtml(p.item_name)).join('、') : '无'}</div>`;
+  }
+
+  html += `<div style='font-size:12px; color:var(--muted); margin-bottom:6px;'>勾选确认正确部件，照片会关联到该部件（可在心愿单查看）</div>`;
+  html += `<div style='display:flex; flex-direction:column; gap:6px; max-height:50vh; overflow-y:auto;'>`;
+  topN.forEach((m, idx) => {
+    const alias = m.alias ? `<span style="font-size:11px; color:var(--muted);">（${escapeHtml(m.alias)}）</span>` : "";
+    const hit = mode === "precise" && precise && precise.some(p => p.item_id === m.item_id);
+    const star = starsOf(m.star || 5);
+    const imgSrc = m.image || '';
+    html += `
+      <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border:1px solid ${hit ? '#2e7d32' : 'var(--border)'}; border-radius:10px; background:#fff;">
+        <input type="checkbox" class="ai-confirm-cb" data-itemid="${m.item_id || ''}" style="width:16px; height:16px; accent-color:var(--primary); flex-shrink:0;" title="确认这是正确部件">
+        <span style="font-weight:700; color:var(--muted); width:22px; text-align:center;">${idx+1}</span>
+        ${imgSrc ? `<img src="${escapeHtml(imgSrc)}" style="width:46px; height:46px; object-fit:contain; border-radius:6px; background:#faf8f3; flex-shrink:0;" loading="lazy" onerror="this.style.visibility='hidden'">` : ''}
+        <div style="flex:1; min-width:0;">
+          <div style="font-weight:600; font-size:14px;">${escapeHtml(m.item_name)} ${alias}</div>
+          <div style="font-size:12px; color:var(--muted);">${escapeHtml(m.type||'')} · ${star} · 相似 ${m.sim}</div>
+        </div>
+        <button class="ai-goto-set" data-setid="${m.set_id || ''}" style="border:1px solid var(--primary); color:var(--primary); background:#fff; border-radius:8px; padding:5px 10px; font-size:12px; cursor:pointer; flex-shrink:0;">套装</button>
+      </div>`;
+  });
+  html += `</div>`;
+  html += `<div style="display:flex; justify-content:flex-end; margin-top:10px;">
+    <button id="ai-confirm-btn" disabled style="border:none; background:var(--primary); color:#fff; border-radius:8px; padding:10px 20px; font-size:14px; font-weight:600; cursor:pointer; opacity:0.4;">确认关联照片</button>
+  </div>`;
+  $("ai-result").innerHTML = html;
+
+  // 跳转套装
+  $("ai-result").querySelectorAll(".ai-goto-set").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const sid = parseInt(btn.dataset.setid, 10);
+      if (sid) { aiMask.classList.remove("show"); window.location.href = `/set/${sid}`; }
+    });
+  });
+
+  // 勾选后启用确认按钮
+  const confirmBtn = $("ai-confirm-btn");
+  const cbs = [...document.querySelectorAll(".ai-confirm-cb")];
+  const updateConfirm = () => {
+    const anyChecked = cbs.some(cb => cb.checked);
+    confirmBtn.disabled = !anyChecked;
+    confirmBtn.style.opacity = anyChecked ? "1" : "0.4";
+  };
+  cbs.forEach(cb => cb.addEventListener("change", updateConfirm));
+
+  // 确认关联照片
+  confirmBtn.addEventListener("click", async () => {
+    const checked = cbs.filter(cb => cb.checked).map(cb => parseInt(cb.dataset.itemid, 10));
+    if (checked.length === 0) return;
+    confirmBtn.disabled = true; confirmBtn.textContent = "关联中…";
+    for (const itemId of checked) {
+      await fetch("/api/photo/link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ item_id: itemId, file: data.file })
+      });
+    }
+    confirmBtn.textContent = "已关联";
+    setTimeout(() => { confirmBtn.textContent = "确认关联照片"; updateConfirm(); }, 2000);
+  });
+}
+
+// ===== 心愿单 =====
+$("btn-wishlist").addEventListener("click", async () => {
+  window.location.href = "/wishlist";
+  return;
+  $("wishlist-mask").classList.add("show");
+  $("wishlist-items").innerHTML = "<div style='padding:12px; color:var(--muted);'>加载中…</div>";
+  try {
+    const res = await fetch("/api/wishlist");
+    const data = await res.json();
+    const items = data.items || [];
+    if (items.length === 0) {
+      $("wishlist-items").innerHTML = "<div style='padding:12px; color:var(--muted);'>心愿单为空</div>";
+    } else {
+      $("wishlist-items").innerHTML = items.map(it => {
+        const setInfo = it.set_name ? `<div style="font-size:11px; color:var(--muted);">${escapeHtml(it.set_name)}${it.set_alias ? '（' + escapeHtml(it.set_alias) + '）' : ''}</div>` : "";
+        return `
+        <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border:1px solid var(--border); border-radius:10px; background:#fff; margin-bottom:6px;">
+          <div style="flex:1; min-width:0;">
+            <div style="font-weight:600; font-size:14px;">${escapeHtml(it.name)}</div>
+            ${setInfo}
+            <div style="font-size:12px; color:var(--muted);">${escapeHtml(it.type || '')} · ${starsOf(it.star)}${it.owned ? ' · 已拥有' : ''}</div>
+          </div>
+          <button class="wish-photos-btn" data-itemid="${it.item_id}" data-name="${escapeHtml(it.name)}" style="border:1px solid var(--primary); color:var(--primary); background:#fff; border-radius:8px; padding:5px 10px; font-size:12px; cursor:pointer;">查看参考${it.photo_count ? `（${it.photo_count}）` : ''}</button>
+          <button class="wish-del-btn" data-itemid="${it.item_id}" style="border:1px solid #f87171; background:#fff; color:#c0392b; border-radius:8px; padding:5px 10px; font-size:12px; cursor:pointer;">移除</button>
+        </div>`;
+      }).join("");
+
+      // 查看参考照片
+      $("wishlist-items").querySelectorAll(".wish-photos-btn").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const itemId = parseInt(btn.dataset.itemid, 10);
+          const name = btn.dataset.name;
+          await openItemPhotos(itemId, name);
+        });
+      });
+      // 移除
+      $("wishlist-items").querySelectorAll(".wish-del-btn").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          await fetch("/api/wishlist/toggle", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ item_id: parseInt(btn.dataset.itemid, 10) })
+          });
+          btn.closest("div[style*='flex:1']").parentElement.remove();
+        });
+      });
+    }
+  } catch (e) {
+    $("wishlist-items").innerHTML = `<div style='padding:12px; color:#c0392b;'>加载失败：${escapeHtml(String(e))}</div>`;
+  }
+});
+$("wishlist-mask").addEventListener("click", e => { if (e.target === $("wishlist-mask")) $("wishlist-mask").classList.remove("show"); });
+
+// 查看某部件的参考照片（AI 识别上传的多张图）
+async function openItemPhotos(itemId, name) {
+  let photos = [];
+  try {
+    const res = await fetch(`/api/parts-photos?item_id=${itemId}`);
+    const data = await res.json();
+    photos = data.photos || [];
+  } catch (e) {
+    photos = [];
+  }
+  let html = `<h3 style="margin-bottom:10px;">参考照片 - ${escapeHtml(name)}</h3>`;
+  if (photos.length === 0) {
+    html += `<div style="padding:12px; color:var(--muted);">暂无 AI 识别上传的照片</div>`;
+  } else {
+    html += `<div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(160px,1fr)); gap:12px;">`;
+    photos.forEach(p => {
+      const createdAt = p.created_at ? `<div style="font-size:11px; color:var(--muted); margin-top:4px;">${escapeHtml(p.created_at)}</div>` : "";
+      html += `
+        <div style="border:1px solid var(--border); border-radius:10px; overflow:hidden; background:#fff;">
+          <img src="/uploads/${escapeHtml(p.file_path)}" style="width:100%; height:180px; object-fit:cover; cursor:pointer;" onclick="openBigImage('/uploads/${escapeHtml(p.file_path)}')" title="点击查看大图">
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px;">
+            ${createdAt}
+            <button class="photo-del-btn" data-photoid="${p.id}" style="border:none; background:#fdecea; color:#c0392b; border-radius:6px; padding:3px 8px; font-size:12px; cursor:pointer;">删除</button>
+          </div>
+        </div>`;
+    });
+    html += `</div>`;
+  }
+  $("wishlist-items").innerHTML = html;
+
+  // 删除照片
+  $("wishlist-items").querySelectorAll(".photo-del-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const pid = parseInt(btn.dataset.photoid, 10);
+      await fetch("/api/photo/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: pid })
+      });
+      // 重新加载照片列表
+      await openItemPhotos(itemId, name);
+    });
+  });
+}
+
+loadData();
+</script>
+</body>
+</html>

@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>心愿单 · 以闪亮之名</title>
+<style>
+  :root {
+    --primary: #a67a32;
+    --primary-dark: #a67a32;
+    --bg: #f4f1ea;
+    --card: #fff;
+    --border: #e5dfd0;
+    --shadow: 0 2px 8px rgba(0,0,0,.04);
+    --text: #2c2b28;
+    --muted: #8a8578;
+    --accent: #a67a32;
+    --owned-border: #cfe3c8;
+    --owned-bg: #f2f7ef;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--text); }
+
+  header { max-width: 1400px; margin: 0 auto; padding: 20px 24px 0; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+  header h1 { font-size: 22px; font-weight: 700; }
+  header .head-right { display: flex; gap: 8px; align-items: center; }
+  .btn-back { border: 1px solid var(--primary); background: var(--primary); color: #fff; border-radius: 8px; padding: 9px 18px; font-size: 13px; font-weight: 600; cursor: pointer; text-decoration: none; transition: .15s; }
+  .btn-back:hover { background: var(--primary-dark); }
+
+  .layout { max-width: 1400px; margin: 20px auto 60px; padding: 0 24px; display: flex; gap: 20px; align-items: flex-start; }
+  .layout-main { flex: 1; min-width: 0; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; align-items: stretch; }
+
+  /* 心愿单筛选条 */
+  .wish-filter { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+  .wish-filter input { flex: 1 1 200px; min-width: 0; box-sizing: border-box; padding: 9px 12px; border: 1px solid var(--border); border-radius: 9px; font-size: 13px; background: #fff; }
+  .wish-filter input:focus { outline: none; border-color: var(--primary); }
+  .wish-filter select { flex: 0 0 auto; min-width: 0; box-sizing: border-box; padding: 9px 12px; border: 1px solid var(--border); border-radius: 9px; font-size: 13px; background: #fff; max-width: 40vw; }
+  .wish-filter .f-clear { flex: 0 0 auto; border: 1px solid var(--border); background: #fff; color: var(--text); border-radius: 9px; padding: 9px 16px; font-size: 13px; cursor: pointer; }
+  .wish-filter .f-clear:hover { border-color: var(--primary); color: var(--primary); }
+
+  /* 竖卡：整体卡面高度统一 */
+  .card { background: var(--card); border-radius: 18px; border: 1px solid var(--border); box-shadow: var(--shadow); overflow: hidden; transition: .2s;
+         display: flex; flex-direction: column; }
+  .card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.08); transform: translateY(-2px); }
+
+  /* 封面：参考图多图轮播，hover 才显示左右导航，宽度撑满 + cover 居中裁剪 */
+  .left { position: relative; width: 100%; height: 360px; background: #faf8f3; overflow: hidden;
+          display: flex; align-items: center; justify-content: center; }
+  .left img.slide { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center; background: #faf8f3; }
+  .nav { position: absolute; top: 50%; transform: translateY(-50%); width: 34px; height: 34px; border-radius: 50%;
+         border: none; background: rgba(0,0,0,.45); color: #fff; font-size: 18px; cursor: pointer;
+         display: none; align-items: center; justify-content: center; z-index: 2; }
+  .left:hover .nav { display: flex; }
+  .nav.prev { left: 8px; }
+  .nav.next { right: 8px; }
+  .counter { position: absolute; right: 8px; bottom: 8px; z-index: 2; background: rgba(0,0,0,.5); color: #fff;
+             font-size: 12px; padding: 2px 8px; border-radius: 10px; }
+  .del { position: absolute; top: 8px; right: 8px; z-index: 3; width: 24px; height: 24px; border: none; border-radius: 50%;
+         background: rgba(0,0,0,.5); color: #fff; font-size: 16px; line-height: 1; cursor: pointer;
+         display: none; align-items: center; justify-content: center; padding: 0; }
+  .left:hover .del { display: flex; }
+  .del:hover { background: #c0392b; }
+
+  .info { padding: 14px 16px; display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; font-size: 13px; flex: 1; align-content: start; }
+  .info .k { color: var(--muted); }
+  .info .v { color: var(--text); word-break: break-all; }
+  /* 部件名：文字 + 小缩略图，点击均可查看部件大图 */
+  .info .v.part-cell { display: flex; align-items: center; gap: 8px; }
+  .part-thumb { width: 100px; height: 100px; object-fit: contain; border-radius: 8px; border: 1px solid var(--border); background: #faf8f3; cursor: pointer; flex: none; }
+  .info .v a.part-link { color: var(--primary); text-decoration: none; font-weight: 600; cursor: pointer; }
+  .info .v a.part-link:hover { text-decoration: underline; }
+  /* 套装名做成文字链接 */
+  .info .v.set a { color: var(--primary); text-decoration: none; }
+  .info .v.set a:hover { text-decoration: underline; }
+  .loose-source { color: #b8860b; font-weight: 600; }
+
+  .bar { padding: 10px 16px 14px; display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: var(--muted); border-top: 1px solid var(--border); gap: 8px; }
+  .bar button.rm { border: 1px solid #f1b8b0; background: #fff; color: #c0392b; border-radius: 8px; padding: 5px 12px; font-size: 12px; cursor: pointer; }
+  .bar button.rm:hover { background: #fdecea; }
+  .bar button.up { border: 1px solid var(--primary); background: #fff; color: var(--primary); border-radius: 8px; padding: 5px 12px; font-size: 12px; cursor: pointer; font-weight: 600; }
+  .bar button.up:hover { background: #faf3e6; }
+
+  /* 上传参考图弹层 */
+  .up-mask { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 300; display: none; align-items: center; justify-content: center; padding: 24px; }
+  .up-mask.show { display: flex; }
+  .up-box { background: var(--card); border-radius: 16px; width: 520px; max-width: 96vw; overflow: hidden; box-shadow: 0 8px 30px rgba(0,0,0,.25); }
+  .up-head { padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+  .up-head h3 { font-size: 15px; font-weight: 700; }
+  .up-head .close { border: none; background: none; font-size: 22px; cursor: pointer; color: var(--muted); line-height: 1; }
+  .up-body { padding: 16px 18px; }
+  .up-drop { border: 1.5px dashed var(--border); border-radius: 12px; padding: 28px 16px; text-align: center; color: var(--muted); cursor: pointer; transition: .15s; font-size: 13px; }
+  .up-drop:hover { border-color: var(--primary); color: var(--primary); }
+  .up-preview { margin-top: 12px; text-align: center; display: none; }
+  .up-preview img { max-width: 100%; max-height: 260px; border-radius: 10px; object-fit: contain; background: #faf8f3; }
+  .up-status { font-size: 12px; color: var(--muted); margin-top: 10px; text-align: center; }
+  .up-foot { padding: 12px 18px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+  .up-foot button { border-radius: 8px; padding: 8px 16px; font-size: 13px; cursor: pointer; }
+  .up-foot .primary { border: 1px solid var(--primary); background: var(--primary); color: #fff; font-weight: 600; }
+  .up-foot .primary:disabled { opacity: .5; cursor: not-allowed; }
+  .bar button.up { border: 1px solid var(--primary); background: #fff; color: var(--primary); border-radius: 8px; padding: 5px 12px; font-size: 12px; cursor: pointer; font-weight: 600; }
+  .bar button.up:hover { background: #faf3e6; }
+
+  /* 上传参考图匹配弹层 */
+  .match-mask { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 300; display: none; align-items: center; justify-content: center; padding: 24px; }
+  .match-mask.show { display: flex; }
+  .match-box { background: var(--card); border-radius: 16px; width: 860px; max-width: 96vw; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 8px 30px rgba(0,0,0,.25); }
+  .match-head { padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+  .match-head h3 { font-size: 15px; font-weight: 700; }
+  .match-head .close { border: none; background: none; font-size: 22px; cursor: pointer; color: var(--muted); line-height: 1; }
+  .match-body { padding: 14px 18px; overflow: auto; }
+  .match-drop { border: 1.5px dashed var(--border); border-radius: 12px; padding: 22px; text-align: center; color: var(--muted); cursor: pointer; transition: .15s; font-size: 13px; }
+  .match-drop:hover { border-color: var(--primary); color: var(--primary); }
+  .match-status { font-size: 12px; color: var(--muted); margin: 10px 0; }
+  .cand-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+  .cand { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: #fff; display: flex; flex-direction: column; }
+  .cand.hit { border-color: #2e7d32; box-shadow: 0 0 0 1px #2e7d32; }
+  .cand.dim { opacity: .45; }
+  .cand img.preview { width: 100%; height: 120px; object-fit: contain; background: #faf8f3; }
+  .cand .info { padding: 6px 8px; }
+  .cand .cand-top { display: flex; align-items: center; gap: 6px; }
+  .cand .name { font-size: 12px; font-weight: 600; line-height: 1.3; }
+  .cand .badge { font-size: 10px; color: #fff; background: var(--primary); border-radius: 6px; padding: 1px 5px; margin-left: 4px; }
+  .cand .meta { font-size: 11px; color: var(--muted); margin-top: 3px; line-height: 1.3; }
+  .loose-tag { color: #b8860b; font-weight: 600; }
+  .match-foot { padding: 12px 18px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+  .match-foot button { border-radius: 8px; padding: 8px 16px; font-size: 13px; cursor: pointer; }
+  .match-foot .primary { border: 1px solid var(--primary); background: var(--primary); color: #fff; font-weight: 600; }
+  .match-foot .primary:disabled { opacity: .5; cursor: not-allowed; }
+  .match-foot .precise { border: 1px solid var(--primary); background: #fff; color: var(--primary); font-weight: 600; }
+  .match-foot .precise:disabled { opacity: .5; cursor: not-allowed; }
+
+  .empty { margin: 40px 0; text-align: center; color: var(--muted); font-size: 14px; }
+
+  /* 分页控件 */
+  .pager { margin: 24px 0 0; display: flex; justify-content: center; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .pager button { border: 1px solid var(--border); background: #fff; color: var(--text); border-radius: 8px; min-width: 34px; height: 34px; font-size: 13px; cursor: pointer; padding: 0 10px; transition: .15s; }
+  .pager button:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+  .pager button.active { background: var(--primary); color: #fff; border-color: var(--primary); font-weight: 600; }
+  .pager button:disabled { opacity: .4; cursor: not-allowed; }
+  .pager .pg-info { font-size: 12px; color: var(--muted); margin: 0 8px; white-space: nowrap; }
+
+  /* 大图弹层（查看部件图 / 参考图） */
+  .img-mask { position: fixed; inset: 0; background: rgba(0,0,0,.75); z-index: 200; display: none; align-items: center; justify-content: center; padding: 30px; cursor: zoom-out; }
+  .img-mask.show { display: flex; }
+  .img-mask img { max-width: 94vw; max-height: 94vh; object-fit: contain; border-radius: 8px; }
+
+  /* 右侧卡池统计面板 */
+  .gacha-panel { width: 300px; flex: none; position: sticky; top: 20px; max-height: calc(100vh - 40px); overflow-y: auto; background: var(--card); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow); padding: 16px; }
+  .gacha-panel h3 { font-size: 15px; font-weight: 700; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: baseline; }
+  .gacha-panel .g-sub { font-size: 11px; color: var(--muted); font-weight: 400; }
+  .gacha-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 8px; font-size: 13px; }
+  .gacha-row:hover { background: #faf3e6; }
+  .gacha-name { color: var(--primary); font-weight: 600; cursor: pointer; border-bottom: 1px dashed #d4a94e; }
+  .gacha-name:hover { text-decoration: underline; }
+  .gacha-alias { color: #b8860b; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .gacha-count { background: var(--primary); color: #fff; border-radius: 10px; padding: 1px 8px; font-size: 11px; font-weight: 600; flex: none; }
+  .gacha-other { color: var(--muted); }
+  .gacha-other .gacha-count { background: var(--muted); }
+
+  /* 手机端适配：双栏变单栏，卡池统计面板移到卡片下方，卡片网格单列 */
+  @media (max-width: 768px) {
+    header { padding: 14px 14px 0; }
+    header h1 { font-size: 18px; }
+    .layout { flex-direction: column; padding: 0 14px; margin: 14px auto 40px; gap: 14px; }
+    .layout-main { width: 100%; }
+    .wish-filter { margin-bottom: 12px; }
+    .wish-filter select { flex: 1 1 40%; max-width: none; }
+    .wish-filter #f-alias { flex: 1 1 40%; }
+    .cards { grid-template-columns: 1fr; gap: 12px; }
+    .card { border-radius: 14px; }
+    .left { height: 300px; }
+    .part-thumb { width: 72px; height: 72px; }
+    .gacha-panel { width: 100%; position: static; max-height: none; order: 2; }
+    .gacha-row { padding: 9px 10px; font-size: 14px; }
+    .gacha-name { font-size: 14px; }
+    /* 弹窗：手机端接近全屏沉浸式，header 固定 + 内容滚动 */
+    .modal-mask { padding: 0; align-items: stretch; }
+    .modal { width: 100vw; height: 100dvh; max-height: none; border-radius: 0; padding: 18px 16px 40px; }
+    .up-mask, .match-mask { padding: 0; }
+    .up-box, .match-box { width: 100vw; height: 100dvh; max-height: none; border-radius: 0; padding: 18px 16px 40px; overflow-y: auto; }
+    .up-head, .match-head { position: sticky; top: 0; background: #fff; padding-bottom: 12px; z-index: 2; }
+    .cand-grid { grid-template-columns: repeat(2, 1fr); }
+    .gacha-set-card { width: 48%; }
+    .match-grid { grid-template-columns: repeat(2, 1fr) !important; }
+  }
+
+  /* 卡池弹窗（与首页同款） */
+  .modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 150; display: none; align-items: center; justify-content: center; padding: 20px; }
+  .modal-mask.show { display: flex; }
+  .modal { background: #fff; border-radius: 18px; width: min(540px, 96vw); max-height: 88vh; overflow-y: auto; padding: 22px 24px; box-shadow: 0 8px 24px rgba(0,0,0,.18); }
+  .modal h3 { font-size: 17px; margin-bottom: 14px; }
+  .gacha-set-card { width: 110px; border: 1px solid var(--border); border-radius: 10px; padding: 6px; cursor: pointer; background: var(--bg); text-align: center; transition: transform .15s, box-shadow .15s; }
+  .gacha-set-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,.12); }
+  .gacha-set-card img { width: 100%; height: 150px; object-fit: contain; border-radius: 8px; background: #f7f5f0; }
+  .gacha-set-card .g-name { font-size: 12px; font-weight: 600; margin-top: 6px; line-height: 1.3; }
+  .gacha-set-card .g-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .gacha-set-card.loose-card.owned { background: var(--owned-bg); border-color: var(--owned-border); }
+  .gacha-set-card.loose-card .g-name { font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>心愿单 · 以闪亮之名</h1>
+  <div class="head-right">
+    <button class="btn-back" style="background:#fff;color:var(--primary)" onclick="openManual()">＋ 未识别部件传图</button>
+    <a class="btn-back" href="/">← 返回首页</a>
+  </div>
+</header>
+
+<div class="layout">
+  <div class="layout-main">
+    <div class="wish-filter">
+      <select id="f-type"><option value="">全部部位</option></select>
+      <input type="text" id="f-alias" placeholder="套装别名 / 花名…" autocomplete="off">
+      <button class="f-clear" onclick="clearFilter()">清除</button>
+    </div>
+    <div id="cards" class="cards"></div>
+    <div class="empty" id="empty" style="display:none;">心愿单为空，去衣橱添加吧～</div>
+    <div id="pager" class="pager" style="display:none;"></div>
+  </div>
+  <aside class="gacha-panel" id="gacha-panel">
+    <h3>卡池统计 <span class="g-sub">按部件归属次数</span></h3>
+    <div id="gacha-list"></div>
+  </aside>
+</div>
+
+<!-- 大图弹层 -->
+<div class="img-mask" id="img-mask"><img id="img-big" src="" alt=""></div>
+
+<!-- 卡池弹窗 -->
+<div class="modal-mask" id="gacha-mask">
+  <div class="modal">
+    <h3 id="gacha-title"></h3>
+    <div id="gacha-sets" style="display:flex; flex-wrap:wrap; gap:12px; margin-top:8px;"></div>
+  </div>
+</div>
+
+<!-- 上传参考图弹层 -->
+<div class="up-mask" id="up-mask">
+  <div class="up-box">
+    <div class="up-head">
+      <h3 id="up-title">上传参考图</h3>
+      <button class="close" onclick="closeUpload()">×</button>
+    </div>
+    <div class="up-body">
+      <div class="up-drop" id="up-drop">点击选择图片</div>
+      <input type="file" id="up-file" accept="image/*" style="display:none">
+      <div class="up-preview" id="up-preview"><img id="up-preview-img" src="" alt=""></div>
+      <div class="up-status" id="up-status"></div>
+    </div>
+    <div class="up-foot">
+      <button class="primary" id="up-save" disabled onclick="saveUpload()">上传</button>
+    </div>
+  </div>
+</div>
+
+<!-- 未识别部件手动传图弹层：选图 + 搜索选部件 + 上传关联 -->
+<div class="up-mask" id="manual-mask">
+  <div class="up-box">
+    <div class="up-head">
+      <h3>未识别部件 · 手动传图</h3>
+      <button class="close" onclick="closeManual()">×</button>
+    </div>
+    <div class="up-body">
+      <div class="up-drop" id="manual-drop">点击选择参考图</div>
+      <input type="file" id="manual-file" accept="image/*" style="display:none">
+      <div class="up-preview" id="manual-preview"><img id="manual-preview-img" src="" alt=""></div>
+      <div style="margin-top:12px">
+        <input type="text" id="manual-q" placeholder="输入部件名 / 套装别名搜索…" autocomplete="off"
+               style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px">
+        <div id="manual-list" style="margin-top:8px;max-height:200px;overflow:auto"></div>
+      </div>
+      <div class="up-status" id="manual-status"></div>
+    </div>
+    <div class="up-foot">
+      <button class="primary" id="manual-save" disabled onclick="saveManual()">上传关联</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const apiBase = "/api";
+const COVER_H = 260;              // 封面统一高度，保证卡面整体大小统一
+const PAGE_SIZE = 15;             // 每页卡面数
+let allItems = [];                // 全量卡面数据（含参考图）
+let curPage = 1;                  // 当前页码
+let ALL_GACHAS = [];              // 全量卡池名单（散件归属匹配用）
+let ALL_GACHA_ALIASES = {};       // 卡池名 → 限时别名展示串（六星单个别名 / 五星两个别名）
+
+function escapeHtml(s){
+  return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+function starColor(s){
+  s = parseInt(s) || 0;
+  if(s>=6) return "#c9963f";
+  if(s>=5) return "#9b59b6";
+  if(s>=4) return "#3498db";
+  if(s>=3) return "#27ae60";
+  return "#95a5a6";
+}
+
+function fmtDate(ts){
+  if(!ts) return "";
+  const d = new Date(ts * 1000);
+  if(isNaN(d)) return String(ts);
+  return d.getFullYear()+"-"+
+    String(d.getMonth()+1).padStart(2,"0")+"-"+
+    String(d.getDate()).padStart(2,"0")+" "+
+    String(d.getHours()).padStart(2,"0")+":"+
+    String(d.getMinutes()).padStart(2,"0");
+}
+
+async function loadPhotos(itemId){
+  try{
+    const r = await fetch(apiBase + "/parts-photos?item_id=" + itemId);
+    const d = await r.json();
+    return (d.photos && d.photos.length)
+      ? d.photos.map(p => p.file_path ? { id: p.id, url: "/uploads/" + p.file_path } : null).filter(Boolean)
+      : [];
+  }catch(e){ return []; }
+}
+
+function openBigImage(src){
+  if(!src) return;
+  document.getElementById("img-big").src = src;
+  document.getElementById("img-mask").classList.add("show");
+}
+document.getElementById("img-mask").addEventListener("click", () => {
+  document.getElementById("img-mask").classList.remove("show");
+  document.getElementById("img-big").src = "";
+});
+
+function cardHTML(it){
+  const photos = it._photos || [];
+  const cover = photos.length ? photos[0].url : (it.image_big || it.image || "");
+  const star = it.star != null ? it.star : 0;
+  const statusText = it.owned ? "已拥有" : "未拥有";
+  const refCount = photos.length || 0;
+  const setId = it.set_id;
+
+  // 套装字段：有 set → 套装链接，优先显示别名（玩家俗称），无别名回退正式名；散件 → 「散件-来源：obtain」
+  let setHtml;
+  if(setId){
+    const setName = it.set_alias || it.set_name || "套装";
+    setHtml = '<a href="/set/'+setId+'?from=wishlist" title="'+escapeHtml(it.set_name||"")+'">'+escapeHtml(setName)+'</a>';
+  } else {
+    const src = it.obtain || it.set_name || it.set_alias || "未知";
+    setHtml = '<span class="loose-source">散件-来源：'+escapeHtml(src)+'</span>';
+  }
+
+  // 部件名：文字 + 小缩略图，点击均可查看部件大图
+  const partImg = it.image_big || it.image || "";
+  let partLink;
+  if(partImg){
+    const esc = escapeHtml(partImg).replace(/'/g,"\\'");
+    partLink = '<img class="part-thumb" src="'+esc+'" onclick="openBigImage(\''+esc+'\')" onerror="this.style.display=\'none\'">'
+             + '<a class="part-link" href="javascript:void(0)" onclick="openBigImage(\''+esc+'\')">'+escapeHtml(it.name||"—")+'</a>';
+  } else {
+    partLink = escapeHtml(it.name||"—");
+  }
+
+  const hasMulti = photos.length > 1;
+  const delBtn = photos.length ? `
+      <button class="del" title="删除这张参考图" onclick="delPhoto(event,${it.item_id},0)">×</button>` : ``;
+  return `
+  <div class="card" data-item="${it.item_id}">
+    <div class="left">
+      <img class="slide" src="${cover}" onclick="openBigImage('${cover.replace(/'/g,"\\'")}')"
+           onerror="this.style.visibility='hidden'">
+      ${delBtn}
+      ${hasMulti ? `
+      <button class="nav prev" onclick="step(event,${it.item_id},-1)">‹</button>
+      <button class="nav next" onclick="step(event,${it.item_id},1)">›</button>
+      <span class="counter">1/${photos.length}</span>` : ``}
+    </div>
+    <div class="info">
+      <span class="k">部件</span><span class="v part-cell">${partLink}</span>
+      <span class="k">部位</span><span class="v">${escapeHtml(it.type||"—")}</span>
+      <span class="k">星级</span><span class="v" style="color:${starColor(star)};font-weight:600">${"★".repeat(parseInt(star)||0)} ${star}</span>
+      <span class="k">套装</span><span class="v set">${setHtml}</span>
+      <span class="k">状态</span><span class="v">${statusText}</span>
+      <span class="k">参考</span><span class="v ref">${refCount} 张</span>
+    </div>
+    <div class="bar">
+      <span>${fmtDate(it.ts)}</span>
+      <span>
+        <button class="up" onclick="openUpload(${it.item_id}, '${String(it.name||"").replace(/'/g,"\\'")}')">上传参考图</button>
+        <button class="rm" onclick="removeWish(${it.item_id})">移除</button>
+      </span>
+    </div>
+  </div>`;
+}
+
+/* ===== 上传参考图：手动关联到当前部件 ===== */
+let upItemId = null;
+let upFile = null;
+
+function openUpload(itemId, name){
+  upItemId = itemId;
+  upFile = null;
+  document.getElementById("up-title").textContent = "上传参考图 · " + (name || itemId);
+  document.getElementById("up-file").value = "";
+  document.getElementById("up-preview").style.display = "none";
+  document.getElementById("up-preview-img").src = "";
+  document.getElementById("up-drop").style.display = "";
+  document.getElementById("up-status").textContent = "";
+  document.getElementById("up-save").disabled = true;
+  document.getElementById("up-mask").classList.add("show");
+}
+function closeUpload(){
+  document.getElementById("up-mask").classList.remove("show");
+  upItemId = null;
+}
+
+document.getElementById("up-drop").addEventListener("click", () => document.getElementById("up-file").click());
+document.getElementById("up-mask").addEventListener("click", (e) => { if(e.target.id === "up-mask") closeUpload(); });
+document.getElementById("up-file").addEventListener("change", () => {
+  const f = document.getElementById("up-file").files[0];
+  if(!f) return;
+  upFile = f;
+  const reader = new FileReader();
+  reader.onload = () => {
+    document.getElementById("up-preview-img").src = reader.result;
+    document.getElementById("up-preview").style.display = "block";
+    document.getElementById("up-drop").style.display = "none";
+    document.getElementById("up-save").disabled = false;
+    document.getElementById("up-status").textContent = "已选择：" + f.name;
+  };
+  reader.readAsDataURL(f);
+});
+
+async function saveUpload(){
+  if(!upItemId || !upFile) return;
+  const btn = document.getElementById("up-save");
+  btn.disabled = true; btn.textContent = "上传中…";
+  const fd = new FormData();
+  fd.append("file", upFile);
+  fd.append("item_id", upItemId);
+  try{
+    const res = await fetch(apiBase + "/photo/upload", { method: "POST", body: fd });
+    const d = await res.json();
+    if(d.error) throw new Error(d.error);
+    // 关联成功，刷新该卡面参考图
+    const photos = await loadPhotos(upItemId);
+    window._photos[upItemId] = photos;
+    window._idx[upItemId] = 0;
+    refreshCardPhotos(upItemId, photos);
+    closeUpload();
+  }catch(e){
+    document.getElementById("up-status").textContent = "上传失败：" + e.message;
+    btn.disabled = false; btn.textContent = "关联到该部件";
+  }
+}
+
+/* ===== 未识别部件手动传图：选图 + 搜部件 + 上传关联 ===== */
+let manualFile = null;
+let manualItemId = null;
+let manualTimer = null;
+
+function openManual(){
+  manualFile = null; manualItemId = null;
+  document.getElementById("manual-file").value = "";
+  document.getElementById("manual-preview").style.display = "none";
+  document.getElementById("manual-preview-img").src = "";
+  document.getElementById("manual-drop").style.display = "";
+  document.getElementById("manual-q").value = "";
+  document.getElementById("manual-list").innerHTML = "";
+  document.getElementById("manual-status").textContent = "";
+  document.getElementById("manual-save").disabled = true;
+  document.getElementById("manual-mask").classList.add("show");
+}
+function closeManual(){
+  document.getElementById("manual-mask").classList.remove("show");
+}
+
+document.getElementById("manual-drop").addEventListener("click", () => document.getElementById("manual-file").click());
+document.getElementById("manual-mask").addEventListener("click", (e) => { if(e.target.id === "manual-mask") closeManual(); });
+document.getElementById("manual-file").addEventListener("change", () => {
+  const f = document.getElementById("manual-file").files[0];
+  if(!f) return;
+  manualFile = f;
+  const reader = new FileReader();
+  reader.onload = () => {
+    document.getElementById("manual-preview-img").src = reader.result;
+    document.getElementById("manual-preview").style.display = "block";
+    document.getElementById("manual-drop").style.display = "none";
+    document.getElementById("manual-status").textContent = "已选图：" + f.name + "，请在下方搜索并选择部件";
+  };
+  reader.readAsDataURL(f);
+});
+
+// 部件名搜索（防抖 300ms）
+document.getElementById("manual-q").addEventListener("input", () => {
+  clearTimeout(manualTimer);
+  manualTimer = setTimeout(manualSearch, 300);
+});
+async function manualSearch(){
+  const q = document.getElementById("manual-q").value.trim();
+  const list = document.getElementById("manual-list");
+  if(!q){ list.innerHTML = ""; return; }
+  try{
+    const res = await fetch(apiBase + "/parts/search?q=" + encodeURIComponent(q));
+    const d = await res.json();
+    const items = d.items || [];
+    if(!items.length){ list.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:8px">未找到部件，试试部件名或套装别名</div>'; return; }
+    list.innerHTML = items.map(p => {
+      const set = p.set_alias || p.set_name || (p.set_id ? "" : "散件");
+      return `<div class="manual-item" data-id="${p.id}" style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;cursor:pointer;border:1px solid var(--border);border-radius:8px;margin-bottom:6px">
+        <span style="font-weight:600">${escapeHtml(p.name)}</span>
+        <span style="font-size:12px;color:var(--muted)">${escapeHtml(p.type||"—")} · ★${escapeHtml(p.star||"—")} · ${escapeHtml(set||"")}</span>
+      </div>`;
+    }).join("");
+    list.querySelectorAll(".manual-item").forEach(el => {
+      el.onclick = () => {
+        list.querySelectorAll(".manual-item").forEach(x => { x.style.borderColor = "var(--border)"; x.style.background = ""; });
+        el.style.borderColor = "var(--primary)";
+        el.style.background = "#faf3e6";
+        manualItemId = parseInt(el.dataset.id);
+        document.getElementById("manual-status").textContent = "已选部件：" + el.querySelector("span").textContent;
+        document.getElementById("manual-save").disabled = !manualFile;
+      };
+    });
+  }catch(e){
+    list.innerHTML = '<div style="color:#c0392b;font-size:12px;padding:8px">搜索失败：' + escapeHtml(e.message) + '</div>';
+  }
+}
+
+async function saveManual(){
+  if(!manualFile || !manualItemId) return;
+  const btn = document.getElementById("manual-save");
+  btn.disabled = true; btn.textContent = "上传中…";
+  const fd = new FormData();
+  fd.append("file", manualFile);
+  fd.append("item_id", manualItemId);
+  try{
+    const res = await fetch(apiBase + "/photo/upload", { method: "POST", body: fd });
+    const d = await res.json();
+    if(d.error) throw new Error(d.error);
+    // 手动传图的部件即使 owned=0 也要放心愿单展示：幂等加入（不筛 owned）
+    const wres = await fetch(apiBase + "/wishlist/toggle", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ item_id: manualItemId, ensure: true }),
+    });
+    if(!wres.ok){ const wd = await wres.json().catch(()=>({})); throw new Error(wd.error || "加入心愿单失败"); }
+    closeManual();
+    await load();   // 刷新心愿单，正常展示新参考图
+  }catch(e){
+    document.getElementById("manual-status").textContent = "上传失败：" + e.message;
+    btn.disabled = false; btn.textContent = "上传关联";
+  }
+}
+
+function refreshCardPhotos(itemId, photos){
+  const card = document.querySelector('.card[data-item="'+itemId+'"]');
+  if(!card) return;
+  const left = card.querySelector(".left");
+  // 移除旧的轮播元素（图片/导航/计数/删除按钮）
+  left.querySelectorAll("img.slide, .nav, .counter, .del").forEach(n => n.remove());
+
+  if(!photos || !photos.length){
+    // 没有参考图了，回退到部件图
+    const it = (window._items || []).find(x => x.item_id == itemId);
+    const fallback = it ? (it.image_big || it.image || "") : "";
+    if(fallback){
+      const fb = document.createElement("img");
+      fb.className = "slide"; fb.src = fallback;
+      fb.onerror = function(){ this.style.visibility = "hidden"; };
+      left.appendChild(fb);
+    }
+    const refCell = card.querySelector('.info .v.ref');
+    if(refCell) refCell.textContent = "0 张";
+    return;
+  }
+
+  const idx = window._idx[itemId] || 0;
+  const newImg = document.createElement("img");
+  newImg.className = "slide";
+  newImg.src = photos[idx].url;
+  newImg.onclick = () => openBigImage(photos[idx].url);
+  newImg.onerror = function(){ this.style.visibility = "hidden"; };
+  left.appendChild(newImg);
+
+  const delBtn = document.createElement("button");
+  delBtn.className = "del"; delBtn.title = "删除这张参考图";
+  delBtn.textContent = "×";
+  delBtn.onclick = (ev) => delPhoto(ev, itemId, idx);
+  left.appendChild(delBtn);
+
+  if(photos.length > 1){
+    const prev = document.createElement("button");
+    prev.className = "nav prev"; prev.textContent = "‹";
+    prev.onclick = (ev) => step(ev, itemId, -1);
+    const next = document.createElement("button");
+    next.className = "nav next"; next.textContent = "›";
+    next.onclick = (ev) => step(ev, itemId, 1);
+    const counter = document.createElement("span");
+    counter.className = "counter"; counter.textContent = (idx+1) + "/" + photos.length;
+    left.appendChild(prev); left.appendChild(next); left.appendChild(counter);
+  }
+  const refCell = card.querySelector('.info .v.ref');
+  if(refCell) refCell.textContent = photos.length + " 张";
+}
+
+function step(ev, itemId, dir){
+  ev.stopPropagation();
+  const card = document.querySelector('.card[data-item="'+itemId+'"]');
+  const img = card.querySelector(".left img.slide");
+  const counter = card.querySelector(".counter");
+  const photos = window._photos[itemId] || [];
+  if(!photos.length) return;
+  let idx = window._idx[itemId] || 0;
+  idx = (idx + dir + photos.length) % photos.length;
+  window._idx[itemId] = idx;
+  img.src = photos[idx].url;
+  img.onclick = () => openBigImage(photos[idx].url);
+  img.style.visibility = "visible";
+  counter.textContent = (idx+1) + "/" + photos.length;
+  // 更新删除按钮指向当前图
+  const delBtn = card.querySelector(".left .del");
+  if(delBtn) delBtn.onclick = (ev) => delPhoto(ev, itemId, idx);
+}
+
+async function delPhoto(ev, itemId, idx){
+  ev.stopPropagation();
+  const photos = window._photos[itemId] || [];
+  const photo = photos[idx];
+  if(!photo) return;
+  if(!confirm("删除这张参考图？")) return;
+  const btn = ev.currentTarget;
+  btn.disabled = true;
+  try{
+    const res = await fetch(apiBase + "/photo/delete", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({id: photo.id})
+    });
+    const d = await res.json();
+    if(d.error) throw new Error(d.error);
+    photos.splice(idx, 1);
+    window._idx[itemId] = 0;
+    refreshCardPhotos(itemId, photos);
+  }catch(e){
+    alert("删除失败：" + e.message);
+    btn.disabled = false;
+  }
+}
+
+async function removeWish(itemId){
+  if(!confirm("确定移除该部件并删除其全部上传参考图？")) return;
+  await fetch("/api/photo/delete-all", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({item_id: itemId})
+  });
+  load();
+}
+
+/* ===== 右侧卡池统计面板 ===== */
+function starsOf(n){
+  const c = parseInt(n,10);
+  if(!c) return '<span class="stars">—</span>';
+  return '<span class="stars">'+ "★".repeat(c) +'</span>';
+}
+
+// 套装部件归 set_gacha；散件用 obtain 匹配全量卡池名单（与首页 includes 逻辑一致）
+function buildGachaStats(items){
+  const counts = new Map();
+  let other = 0;
+  for(const it of items){
+    if(it.set_gacha){
+      counts.set(it.set_gacha, (counts.get(it.set_gacha)||0) + 1);
+    } else {
+      const obt = it.obtain || "";
+      let hit = null;
+      for(const g of ALL_GACHAS){
+        if(obt.includes(g)){ hit = g; break; }
+      }
+      if(hit) counts.set(hit, (counts.get(hit)||0) + 1);
+      else other++;
+    }
+  }
+  const list = [...counts.entries()].sort((a,b) => b[1]-a[1] || a[0].localeCompare(b[0],"zh"));
+  return { list, other };
+}
+
+function renderGachaPanel(items){
+  const box = document.getElementById("gacha-list");
+  const { list, other } = buildGachaStats(items);
+  if(!list.length && !other){
+    box.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:8px">暂无卡池数据</div>';
+    return;
+  }
+  box.innerHTML = list.map(([g,n]) => {
+    const alias = ALL_GACHA_ALIASES[g] || "";
+    const aliasLine = alias
+      ? `<span class="gacha-alias">${escapeHtml(alias)}</span>`
+      : "";
+    return `<div class="gacha-row">
+      <span class="gacha-name" data-gacha="${escapeHtml(g)}" title="点击查看卡池内容">${escapeHtml(g)}</span>
+      ${aliasLine}
+      <span class="gacha-count">${n}</span>
+    </div>`;
+  }).join("") +
+    (other ? `<div class="gacha-row gacha-other">
+      <span>其他来源</span>
+      <span class="gacha-count">${other}</span>
+    </div>` : "");
+  box.querySelectorAll(".gacha-name").forEach(el => {
+    el.addEventListener("click", () => openGacha(el.dataset.gacha));
+  });
+}
+
+/* ===== 卡池弹窗（与首页 openGacha 同款） ===== */
+async function openGacha(gacha){
+  if(!gacha) return;
+  let d;
+  try{
+    const res = await fetch(apiBase + "/gacha-sets?gacha=" + encodeURIComponent(gacha));
+    d = await res.json();
+  }catch(e){
+    alert("加载卡池失败：" + e.message);
+    return;
+  }
+  const sets = d.sets || [];
+  const loose = d.loose || [];
+  if(!sets.length){ alert("未找到卡池「" + gacha + "」"); return; }
+  const isLimitedHigh = sets.some(s => s.obtain === "限时追光" && (s.star === "5" || s.star === "6"));
+  document.getElementById("gacha-title").textContent = isLimitedHigh
+    ? `卡池「${gacha}」：套装 ${sets.length} · 散件 ${loose.length}`
+    : `卡池「${gacha}」：套装 ${sets.length}`;
+  let html = "";
+  html += sets.map(s => {
+    const parts = s.items || [];
+    const ownedCount = parts.filter(i => i.owned).length;
+    return `
+      <div class="gacha-set-card" data-setid="${s.id}">
+        <img loading="lazy" decoding="async" src="${escapeHtml(s.preview||"")}" onerror="this.style.visibility='hidden'" alt="${escapeHtml(s.name)}">
+        <div class="g-name">${escapeHtml(s.name)}</div>
+        <div class="g-meta">${starsOf(s.star)} ${escapeHtml(s.attribute||"")}</div>
+        <div class="g-meta">部件 ${ownedCount}/${parts.length}</div>
+      </div>`;
+  }).join("");
+  html += loose.map(i => {
+    const owned = i.owned ? "owned" : "";
+    return `
+      <div class="gacha-set-card loose-card ${owned}" data-itemid="${i.id}">
+        <img loading="lazy" decoding="async" src="${escapeHtml(i.image||"")}" onerror="this.style.visibility='hidden'" alt="${escapeHtml(i.name)}">
+        <div class="g-name">${escapeHtml(i.name)}</div>
+        <div class="g-meta">${escapeHtml(i.type||"散件")} · ${starsOf(i.star)}</div>
+        <div class="g-meta">${i.owned ? "✓ 已拥有" : "未拥有"}</div>
+      </div>`;
+  }).join("");
+  const container = document.getElementById("gacha-sets");
+  container.innerHTML = html;
+  container.querySelectorAll(".gacha-set-card[data-setid]").forEach(card => {
+    card.addEventListener("click", () => {
+      document.getElementById("gacha-mask").classList.remove("show");
+      window.location.href = "/set/" + card.dataset.setid + "?from=wishlist";
+    });
+  });
+  container.querySelectorAll(".gacha-set-card[data-itemid]").forEach(card => {
+    card.addEventListener("click", async () => {
+      const itemId = parseInt(card.dataset.itemid, 10);
+      const it = loose.find(x => x.id === itemId);
+      if(!it) return;
+      const next = it.owned ? 0 : 1;
+      try{
+        await fetch(apiBase + "/owned", {
+          method: "POST",
+          headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({item_id: itemId, owned: next})
+        });
+      }catch(e){ alert("更新失败：" + e.message); return; }
+      it.owned = next;
+      card.classList.toggle("owned", !!next);
+      const meta = card.querySelectorAll(".g-meta");
+      if(meta.length >= 2) meta[1].textContent = next ? "✓ 已拥有" : "未拥有";
+      await load();  // 同步刷新心愿单卡片状态（统计不依赖 owned，无需重建）
+    });
+  });
+  document.getElementById("gacha-mask").classList.add("show");
+}
+
+// 弹窗关闭：点遮罩 / Esc
+document.getElementById("gacha-mask").addEventListener("click", (e) => {
+  if(e.target.id === "gacha-mask") document.getElementById("gacha-mask").classList.remove("show");
+});
+document.addEventListener("keydown", (e) => {
+  if(e.key === "Escape") document.getElementById("gacha-mask").classList.remove("show");
+});
+
+async function load(){
+  curPage = 1;
+  const r = await fetch(apiBase + "/wishlist");
+  const data = await r.json();
+  const items = data.items || [];
+  ALL_GACHAS = data.gachas || [];
+  ALL_GACHA_ALIASES = data.gacha_aliases || {};
+  renderGachaPanel(items);
+  window._photos = {}; window._idx = {};
+  const cards = document.getElementById("cards");
+  const empty = document.getElementById("empty");
+  const pager = document.getElementById("pager");
+  if(!items.length){
+    cards.innerHTML = "";
+    empty.style.display = "block";
+    pager.style.display = "none";
+    return;
+  }
+  empty.style.display = "none";
+  window._items = items;
+  const enriched = [];
+  for(const it of items){
+    const photos = await loadPhotos(it.item_id);
+    window._photos[it.item_id] = photos;
+    window._idx[it.item_id] = 0;
+    enriched.push({...it, _photos: photos, ts: it.ts});
+  }
+  allItems = enriched;
+  window._allEnriched = enriched;   // 保留原始全量（含参考图），供筛选还原
+  fillTypeOptions();
+  renderPage();
+}
+
+// 渲染当前页卡面 + 分页控件
+function renderPage(){
+  const cards = document.getElementById("cards");
+  const pager = document.getElementById("pager");
+  const total = allItems.length;
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  if(curPage > pages) curPage = pages;
+  const start = (curPage - 1) * PAGE_SIZE;
+  cards.innerHTML = allItems.slice(start, start + PAGE_SIZE).map(cardHTML).join("");
+
+  const mk = (label, pg, cls, disabled) =>
+    `<button class="${cls||""}" ${disabled?"disabled":""} onclick="goPage(${pg})">${label}</button>`;
+  const btns = [];
+  btns.push(mk("‹ 上一页", curPage-1, "", curPage<=1));
+  let lo = Math.max(1, curPage-3), hi = Math.min(pages, curPage+3);
+  if(hi - lo + 1 < 7){ if(lo === 1) hi = Math.min(pages, lo+6); else if(hi === pages) lo = Math.max(1, hi-6); }
+  if(lo > 1) btns.push(mk("1", 1, "", false), mk("…", 1, "", true));
+  for(let p = lo; p <= hi; p++) btns.push(mk(String(p), p, p===curPage?"active":"", false));
+  if(hi < pages) btns.push(mk("…", pages, "", true), mk(String(pages), pages, "", false));
+  btns.push(mk("下一页 ›", curPage+1, "", curPage>=pages));
+  pager.innerHTML = `<span class="pg-info">共 ${total} 件 · 第 ${curPage}/${pages} 页</span>` + btns.join("");
+  pager.style.display = "flex";
+}
+
+function goPage(n){
+  const pages = Math.max(1, Math.ceil(allItems.length / PAGE_SIZE));
+  if(n < 1 || n > pages || n === curPage) return;
+  curPage = n;
+  renderPage();
+  document.getElementById("cards").scrollIntoView({behavior:"smooth", block:"start"});
+}
+
+/* ===== 筛选：部位下拉 + 套装别名(花名) ===== */
+let filterType = "", filterAlias = "";
+function fillTypeOptions(){
+  const sel = document.getElementById("f-type");
+  const types = [...new Set((window._allEnriched || []).map(it => it.type).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">全部部位</option>' + types.map(t => `<option value="${t}">${t}</option>`).join("");
+}
+document.getElementById("f-type").addEventListener("change", (e) => { filterType = e.target.value; applyFilter(); });
+document.getElementById("f-alias").addEventListener("input", (e) => { filterAlias = e.target.value; applyFilter(); });
+function clearFilter(){
+  filterType = ""; filterAlias = "";
+  document.getElementById("f-type").value = "";
+  document.getElementById("f-alias").value = "";
+  applyFilter();
+}
+function applyFilter(){
+  const t = filterType;
+  const a = filterAlias.trim().toLowerCase();
+  const src = window._allEnriched || [];
+  allItems = src.filter(it => {
+    const okT = !t || (it.type || "") === t;
+    const okA = !a
+      || (it.set_alias || "").toLowerCase().includes(a)
+      || (it.set_name || "").toLowerCase().includes(a);
+    return okT && okA;
+  });
+  curPage = 1;
+  renderPage();
+}
+
+load();
+</script>
+</body>
+</html>

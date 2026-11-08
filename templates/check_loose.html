@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>免活未齐全套装 · 人工确认</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f4f1ea; color: #2c2b28; padding: 24px; }
+  h1 { font-size: 20px; margin-bottom: 6px; }
+  .sub { font-size: 13px; color: #8a8578; margin-bottom: 18px; }
+  .toolbar { margin-bottom: 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .toolbar input { padding: 7px 12px; border: 1px solid #d8d2c2; border-radius: 8px; font-size: 13px; width: 260px; }
+  .btn { padding: 8px 16px; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .btn-mark { background: #a67a32; color: #fff; }
+  .btn-mark:hover { background: #8e6427; }
+  .stat { font-size: 13px; color: #555; margin-left: auto; }
+  .sets-list { display: flex; flex-direction: column; gap: 14px; }
+  .set-card { background: #fff; border-radius: 14px; border: 1px solid #e5dfd0; box-shadow: 0 2px 8px rgba(0,0,0,.04); overflow: hidden; }
+  .set-head { display: flex; align-items: center; gap: 14px; padding: 12px 16px; background: #faf8f2; border-bottom: 1px solid #efe9dc; cursor: pointer; }
+  .set-head img { width: 56px; height: 56px; object-fit: contain; border-radius: 8px; background: #faf8f3; border: 1px solid #eee; }
+  .set-info { flex: 1; }
+  .set-name { font-size: 15px; font-weight: 700; }
+  .set-meta { font-size: 12px; color: #8a8578; margin-top: 2px; }
+  .progress { width: 140px; }
+  .progress-bar { height: 8px; background: #ece6d8; border-radius: 4px; overflow: hidden; }
+  .progress-fill { height: 100%; background: #a67a32; }
+  .progress-text { font-size: 12px; color: #8a8578; margin-top: 3px; }
+  .star { color: #c9963f; letter-spacing: 1px; font-size: 12px; }
+  .set-toggle { font-size: 18px; color: #aaa; }
+  .set-items { display: none; padding: 10px 16px 14px; }
+  .set-card.open .set-items { display: block; }
+  .set-card.open .set-toggle { transform: rotate(90deg); }
+  .items-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; }
+  .item-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid #efe9dc; border-radius: 8px; background: #fdfcf9; }
+  .item-row img { width: 34px; height: 34px; object-fit: cover; border-radius: 5px; background: #faf8f3; border: 1px solid #eee; cursor: zoom-in; }
+  .item-name { flex: 1; font-size: 13px; }
+  .item-type { font-size: 11px; color: #999; background: #f1ecdf; padding: 1px 6px; border-radius: 6px; }
+  .item-row input { width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; }
+  /* 已拥有部件 */
+  .item-row.owned { background: #eef5ea; border-color: #cfe3c8; }
+  .item-row.owned .item-name { color: #4a7c43; }
+  .item-row.owned .item-type { background: #d9ecd2; color: #4a7c43; }
+  .owned-check { color: #5c8a56; font-weight: 700; font-size: 14px; width: 16px; text-align: center; flex-shrink: 0; }
+  .section-label { font-size: 12px; color: #8a8578; font-weight: 600; margin: 8px 2px 4px; }
+  .zoom-mask { position: fixed; inset: 0; background: rgba(0,0,0,.82); display: none; align-items: center; justify-content: center; z-index: 100; cursor: zoom-out; }
+  .zoom-mask.show { display: flex; }
+  .zoom-mask img { max-width: 92vw; max-height: 92vh; border-radius: 8px; }
+  .empty { text-align: center; color: #999; padding: 40px; font-size: 14px; }
+  .legend { font-size: 12px; color: #999; margin-bottom: 12px; }
+</style>
+</head>
+<body>
+<h1>免活「有但不齐」套装 · 人工确认（共 <span id="total-sets">0</span> 套 / 缺失 <span id="total-items">0</span> 件）</h1>
+<div class="sub">以下「免活」来源的套装已拥有部分部件、但尚未齐全。请展开套装，核对缺失部件图片——若实际已拥有，勾选后点「标记为已拥有」。</div>
+
+<div class="toolbar">
+  <input type="text" id="search" placeholder="搜索套装名...">
+  <button class="btn btn-mark" id="btn-mark">标记勾选为已拥有</button>
+  <button class="btn btn-mark" id="btn-own-all" style="background:#5c8a56">整套标记齐全</button>
+  <span class="stat" id="stat"></span>
+</div>
+<div class="legend">提示：点击部件图片可放大；「整套标记齐全」会把当前展开套装的全部缺失部件勾选。</div>
+
+<div class="sets-list" id="sets-list"></div>
+
+<div class="zoom-mask" id="zoom-mask"><img id="zoom-img" alt=""></div>
+
+<script>
+const SETS = [{"set_id": 156, "set_name": "恣夜浮金", "star": "5", "attribute": "酷帅", "preview": "https://patchwiki.biligame.com/images/yslzgame/6/65/01tqu1u52t7zxxj5mjomndd9i8umk42.png", "version": "2.6.1", "total": 7, "owned_cnt": 4, "owned_items": [{"item_id": 1145, "item_name": "奢都夜阑", "type": "帽子", "image": "https://patchwiki.biligame.com/images/yslzgame/thumb/b/be/dzf7i36ry9e72rrtafpxo6imz1208d0.png/100px-%E5%A5%A2%E9%83%BD%E5%A4%9C%E9%98%91%E5%9B%BE%E6%A0%87.png", "owned": 1}, {"item_id": 1144, "item_name": "幽宵华调", "type": "鞋子", "image": "https://patchwiki.biligame.com/images/yslzgame/thumb/2/2c/c9olopo5ugq4sm0jheuj6ejgaigqiy1.png/100px-%E5%B9%BD%E5%AE%B5%E5%8D%8E%E8%B0%83%E5%9B%BE%E6%A0%87.png", "owned": 1}, {"item_id": 1146, "item_name": "星夜拾光", "type": "腕饰", "image": "https://patchwiki.biligame.com/images/yslzgame/thumb/9/93/cr44txxv3v2gzz17p3kh73w4be8tinu.png/100px-%E6%98%9F%E5%A4%9C%E6%8B%BE%E5%85%89%E5%9B%BE%E6%A0%87.png", "owned": 1}, {"item_id": 1143, "item_name": "菱纹夜钟", "type": "袜子", "image": "https://patchwiki.biligame.com/images/yslzgame/thumb/5/50/jtbibd4wmj1guzek77bpxpqsww5ha9o.png/100px-%E8%8F%B1%E7%BA%B9%E5%A4%9C%E9%92%9F%E5%9B%BE%E6%A0%87.png", "owned": 1}], "items": [{"item_id": 1142, "item_name": "恣夜浮金", "type": "下装", "image": "https://patchwiki.biligame.com/images/yslzgame/thumb/5/56/hgatkheaak2ygo4d16m5sd8aluiiamt.png/100px-%E6%81%A3%E5%A4%9C%E6%B5%AE%E9%87%91%E5%9B%BE%E6%A0%87.png"}, {"item_id": 1140, "item_name": "辉月风晚", "type": "发型", "image": "https://patchwiki.biligame.com/images/yslzgame/thumb/8/8b/gf1e8dqnwevhytmvxnuny3h89ifm14j.png/100px-%E8%BE%89%E6%9C%88%E9%A3%8E%E6%99%9A%E5%9B%BE%E6%A0%87.png"}, {"item_id": 1141, "item_name": "霓金纱薇", "type": "上衣", "image": "https://patchwiki.biligame.com/images/yslzgame/thumb/b/be/2jt5wixfd1d19wagt6wftd0uetkir04.png/100px-%E9%9C%93%E9%87%91%E7%BA%B1%E8%96%87%E5%9B%BE%E6%A0%87.png"}]}, {"set_id": 239, "set_name": "月光长诗", "star": "4", "attribute": "简约", "preview": "https://patchwiki.biligame.com/images/yslzgame/3/39/h64w0fbxsd0xl412dt7mmuye60x97lg.png", "version": "2.5.2", "total": 5, "owned_cnt": 4, "owned_items": [{"item_id": 1694, "item_name": "幻月之舞", "type": "鞋子", "image": "https://patchwiki.biligame.com/images/yslzgame/thumb/f/f7/5sr9j4xu3qvzzz60ujs868tjx2342rh.png/100px-%E5%B9%BB%E6%9C%88%E4%B9%8B%E8%88%9E%E5%9B%BE%E6%A0%87.png", "owned": 1}, {"item_id": 1696, "item_name": "晨曦织梦", "type": "颈饰", "image": "https://patchwiki.biligame.com/images/yslzgame/thumb/d/d1/2ucbfvvffh1q6wsefyqrnt2059sztdh.png/100px-%E6%99%A8%E6%9B%A6%E7%BB%87%E6%A2%A6%E5%9B%BE%E6%A0%87.png", "owned": 1}, {"item_id": 1697, "item_name": "碎月之誓", "type": "腕饰", "image": "https://patchwiki.biligame.com/images/yslzgame/thumb/0/03/gfb4y4uf4nxsr0wfblpsrmkd97ynujr.png/100px-%E7%A2%8E%E6%9C%88%E4%B9%8B%E8%AA%93%E5%9B%BE%E6%A0%87.png", "owned": 1}, {"item_id": 1695, "item_name": "霜华月影", "type": "耳饰", "image": "https://patchwiki.biligame.com/images/yslzgame/thumb/e/ee/rewv2grkyqbv69l3zxfx6xhv3i93f7f.png/100px-%E9%9C%9C%E5%8D%8E%E6%9C%88%E5%BD%B1%E5%9B%BE%E6%A0%87.png", "owned": 1}], "items": [{"item_id": 1693, "item_name": "月光长诗", "type": "连衣裙", "image": "https://patchwiki.biligame.com/images/yslzgame/thumb/3/38/c1e95sq9iv6496o896uffvr19mfl4s5.png/100px-%E6%9C%88%E5%85%89%E9%95%BF%E8%AF%97%E5%9B%BE%E6%A0%87.png"}]}, {"set_id": 383, "set_name": "甜柔纪事", "star": "4", "attribute": "甜美", "preview": "https://patchwiki.biligame.com/images/yslzgame/7/72/elpsjbr143yh0di7zrud31zzvrefs8g.png", "version": "3.7.1", "total": 6, "owned_cnt": 2, "owned_items": [{"item_id": 2777, "item_name": "海蓝星坠", "type": "颈饰", "image": "https://patchwiki.biligame.com/images/yslzgame/thumb/6/63/bbsqbxu02j1fai2t2bncw8x71thrbju.png/100px-%E6%B5%B7%E8%93%9D%E6%98%9F%E5%9D%A0%E5%9B%BE%E6%A0%87.png", "owned": 1}, {"item_id": 2778, "item_name": "琥珀书签", "type": "戒指", "image": "https://patchwiki.biligame.com/images/yslzgame/thumb/c/c3/4pqymlrwpxkhaw4vcx13zzesps83e6f.png/100px-%E7%90%A5%E7%8F%80%E4%B9%A6%E7%AD%BE%E5%9B%BE%E6%A0%87.png", "owned": 1}], "items": [{"item_id": 2775, "item_name": "云际暖阳", "type": "袜子", "image": "https://patchwiki.biligame.com/images/yslzgame/thumb/7/76/kbppggsp7l4doa6wju5i7nq3tckbmjj.png/100px-%E4%BA%91%E9%99%85%E6%9A%96%E9%98%B3%E5%9B%BE%E6%A0%87.png"}, {"item_id": 2776, "item_name": "净简蓝调", "type": "鞋子", "image": "https://patchwiki.biligame.com/images/yslzgame/thumb/3/3b/9977ktpnpekwehjn4fecpr39ap9esgd.png/100px-%E5%87%80%E7%AE%80%E8%93%9D%E8%B0%83%E5%9B%BE%E6%A0%87.png"}, {"item_id": 2774, "item_name": "晴午织梦", "type": "下装", "image": "https://patchwiki.biligame.com/images/yslzgame/thumb/2/2b/s98tssncl1j93ql3ws9fix811kyamlu.png/100px-%E6%99%B4%E5%8D%88%E7%BB%87%E6%A2%A6%E5%9B%BE%E6%A0%87.png"}, {"item_id": 2773, "item_name": "甜柔纪事", "type": "上衣", "image": "https://patchwiki.biligame.com/images/yslzgame/thumb/b/bd/roq5r6hw8itl53g1qqs1kze1tvvpiv1.png/100px-%E7%94%9C%E6%9F%94%E7%BA%AA%E4%BA%8B%E5%9B%BE%E6%A0%87.png"}]}, {"set_id": 384, "set_name": "甜梦奇袭", "star": "5", "attribute": "清纯", "preview": "https://patchwiki.biligame.com/images/yslzgame/b/be/srjfxayxa19zbvv69rq8y5v9myjjqux.png", "version": "2.3.2", "total": 7, "owned_cnt": 5, "owned_items": [{"item_id": 2781, "item_name": "未来甜心", "type": "袜子", "image": "https://patchwiki.biligame.com/images/yslzgame/thumb/8/87/ohr50ykq64wvrj1q1yzt85syjxiufgo.png/100px-%E6%9C%AA%E6%9D%A5%E7%94%9C%E5%BF%83%E5%9B%BE%E6%A0%87.png", "owned": 1}, {"item_id": 2782, "item_name": "甜梦战姬", "type": "鞋子", "image": "https://patchwiki.biligame.com/images/yslzgame/thumb/b/bb/pdny5daj6xrzlfx7230cafikg19rpny.png/100px-%E7%94%9C%E6%A2%A6%E6%88%98%E5%A7%AC%E5%9B%BE%E6%A0%87.png", "owned": 1}, {"item_id": 2783, "item_name": "甜蜜冒险", "type": "发饰", "image": "https://patchwiki.biligame.com/images/yslzgame/thumb/d/d1/jq843zjp44yihpq0bo5so49zvkr7y0g.png/100px-%E7%94%9C%E8%9C%9C%E5%86%92%E9%99%A9%E5%9B%BE%E6%A0%87.png", "owned": 1}, {"item_id": 2785, "item_name": "白焰糖星", "type": "脚链", "image": "https://patchwiki.biligame.com/images/yslzgame/thumb/e/e8/sa07q9mcnvuzm9y0y06o3m7vmy8uo35.png/100px-%E7%99%BD%E7%84%B0%E7%B3%96%E6%98%9F%E5%9B%BE%E6%A0%87.png", "owned": 1}, {"item_id": 2784, "item_name": "萌心奇兵", "type": "颈饰", "image": "https://patchwiki.biligame.com/images/yslzgame/thumb/8/8a/bmi8xoiap64noqinixc1uooarmf42mm.png/100px-%E8%90%8C%E5%BF%83%E5%A5%87%E5%85%B5%E5%9B%BE%E6%A0%87.png", "owned": 1}], "items": [{"item_id": 2780, "item_name": "甜梦奇袭", "type": "连衣裙", "image": "https://patchwiki.biligame.com/images/yslzgame/thumb/6/6e/e2xohcsv11mfawd890osvu0y4db09y9.png/100px-%E7%94%9C%E6%A2%A6%E5%A5%87%E8%A2%AD%E5%9B%BE%E6%A0%87.png"}, {"item_id": 2779, "item_name": "萌动先锋", "type": "发型", "image": "https://patchwiki.biligame.com/images/yslzgame/thumb/a/a0/gg77y9lwm7c6zzcj4y65rr0t89s3nvp.png/100px-%E8%90%8C%E5%8A%A8%E5%85%88%E9%94%8B%E5%9B%BE%E6%A0%87.png"}]}, {"set_id": 639, "set_name": "魅力有氧", "star": "4", "attribute": "跃动", "preview": "https://patchwiki.biligame.com/images/yslzgame/5/59/jpelhmrqhyvswsipf6zs1sitwgvknbt.png", "version": "2.2.1", "total": 5, "owned_cnt": 2, "owned_items": [{"item_id": 4612, "item_name": "轻风逐梦", "type": "腕饰", "image": "https://patchwiki.biligame.com/images/yslzgame/thumb/4/43/pxptc34sr5f6g951a2msdls0iy65sv2.png/100px-%E8%BD%BB%E9%A3%8E%E9%80%90%E6%A2%A6%E5%9B%BE%E6%A0%87.png", "owned": 1}, {"item_id": 4610, "item_name": "追光远游", "type": "袜子", "image": "https://patchwiki.biligame.com/images/yslzgame/thumb/c/c5/plk7l52prbwt4bj31hosjyoge040zta.png/100px-%E8%BF%BD%E5%85%89%E8%BF%9C%E6%B8%B8%E5%9B%BE%E6%A0%87.png", "owned": 1}], "items": [{"item_id": 4609, "item_name": "舞力型动", "type": "下装", "image": "https://patchwiki.biligame.com/images/yslzgame/thumb/d/d4/a83yifh4s2r9itu6k43pfi00i0mhm5l.png/100px-%E8%88%9E%E5%8A%9B%E5%9E%8B%E5%8A%A8%E5%9B%BE%E6%A0%87.png"}, {"item_id": 4611, "item_name": "速力千行", "type": "鞋子", "image": "https://patchwiki.biligame.com/images/yslzgame/thumb/1/1b/6ieqfrrjs7pcx7d65j7wgundty16jhf.png/100px-%E9%80%9F%E5%8A%9B%E5%8D%83%E8%A1%8C%E5%9B%BE%E6%A0%87.png"}, {"item_id": 4608, "item_name": "魅力有氧", "type": "上衣", "image": "https://patchwiki.biligame.com/images/yslzgame/thumb/e/ed/mj7n9fh3ow824nshxgnkb92hqcgq9e7.png/100px-%E9%AD%85%E5%8A%9B%E6%9C%89%E6%B0%A7%E5%9B%BE%E6%A0%87.png"}]}, {"set_id": 753, "set_name": "日落沙丘", "star": "4", "attribute": "简约", "preview": null, "version": "4.3.1", "total": 6, "owned_cnt": 5, "owned_items": [{"item_id": 5299, "item_name": "尘嚣之外", "type": "颈饰", "image": "https://patchwiki.biligame.com/images/yslzgame/e/ec/n50m2pcscfzvsb6vqt4s8g1ua82nqxx.png", "owned": 1}, {"item_id": 5300, "item_name": "日落沙丘", "type": "上衣", "image": "https://patchwiki.biligame.com/images/yslzgame/e/ea/i4fmx7vzzpqto00er0fnybih4njfnko.png", "owned": 1}, {"item_id": 5301, "item_name": "暮野行歌", "type": "鞋子", "image": "https://patchwiki.biligame.com/images/yslzgame/a/af/3li7kgn4fprs3d6j4zag8szu7ks17vb.png", "owned": 1}, {"item_id": 5302, "item_name": "炽野猎心", "type": "手套", "image": "https://patchwiki.biligame.com/images/yslzgame/0/00/a409hz16es4m3amhqr9rkcjrbgs8olv.png", "owned": 1}, {"item_id": 5303, "item_name": "荒原旧梦", "type": "下装", "image": "https://patchwiki.biligame.com/images/yslzgame/a/a7/0i7p5r81wtbazpugadf9t38scfcjix5.png", "owned": 1}], "items": [{"item_id": 5304, "item_name": "风色旅人", "type": "袜子", "image": "https://patchwiki.biligame.com/images/yslzgame/5/5e/du9d37upgc11a1qofeaocz8njzf4b7h.png"}]}, {"set_id": 789, "set_name": "暮野寻光", "star": "4", "attribute": "酷帅", "preview": null, "version": "4.2.2", "total": 6, "owned_cnt": 5, "owned_items": [{"item_id": 5529, "item_name": "原野行歌", "type": "手套", "image": "https://patchwiki.biligame.com/images/yslzgame/b/b5/fqbynwdblwu642k0bzggopyc4otb0f9.png", "owned": 1}, {"item_id": 5531, "item_name": "暮蕾含光", "type": "耳饰", "image": "", "owned": 1}, {"item_id": 5532, "item_name": "暮野寻光", "type": "连衣裙", "image": "", "owned": 1}, {"item_id": 5533, "item_name": "雾林微茫", "type": "手持物", "image": "", "owned": 1}, {"item_id": 5534, "item_name": "青蔓时光", "type": "袜子", "image": "", "owned": 1}], "items": [{"item_id": 5530, "item_name": "夜巡苔沼", "type": "鞋子", "image": ""}]}, {"set_id": 879, "set_name": "秘境花颂", "star": "4", "attribute": "华丽", "preview": null, "version": "4.3.1", "total": 6, "owned_cnt": 5, "owned_items": [{"item_id": 6098, "item_name": "春藏花信", "type": "耳饰", "image": "", "owned": 1}, {"item_id": 6099, "item_name": "秘境花颂", "type": "连衣裙", "image": "", "owned": 1}, {"item_id": 6100, "item_name": "繁花绮梦", "type": "发饰", "image": "", "owned": 1}, {"item_id": 6101, "item_name": "花绘心语", "type": "手套", "image": "", "owned": 1}, {"item_id": 6103, "item_name": "蝶庭漫舞", "type": "鞋子", "image": "", "owned": 1}], "items": [{"item_id": 6102, "item_name": "花间巡游", "type": "袜子", "image": ""}]}, {"set_id": 892, "set_name": "织心夜曲", "star": "4", "attribute": "清纯", "preview": null, "version": "4.3.1", "total": 6, "owned_cnt": 4, "owned_items": [{"item_id": 6175, "item_name": "慵风入梦", "type": "鞋子", "image": "", "owned": 1}, {"item_id": 6176, "item_name": "曼妙轻呢", "type": "颈饰", "image": "", "owned": 1}, {"item_id": 6178, "item_name": "织心夜曲", "type": "上衣", "image": "", "owned": 1}, {"item_id": 6180, "item_name": "绯夜荆棘", "type": "袜子", "image": "", "owned": 1}], "items": [{"item_id": 6177, "item_name": "漫夜缱绻", "type": "下装", "image": ""}, {"item_id": 6179, "item_name": "织梦千寻", "type": "手持物", "image": ""}]}, {"set_id": 902, "set_name": "缤色甜梦", "star": "5", "attribute": "清纯", "preview": null, "version": "4.3.2", "total": 7, "owned_cnt": 2, "owned_items": [{"item_id": 6237, "item_name": "云芙过隙", "type": "袜子", "image": "", "owned": 1}, {"item_id": 6242, "item_name": "甜愈魔法", "type": "脚链", "image": "", "owned": 1}], "items": [{"item_id": 6238, "item_name": "幕下星舞", "type": "鞋子", "image": ""}, {"item_id": 6239, "item_name": "晴雨聆虹", "type": "耳饰", "image": ""}, {"item_id": 6240, "item_name": "烘焙糖果", "type": "发饰", "image": ""}, {"item_id": 6241, "item_name": "甜巧可心", "type": "发型", "image": ""}, {"item_id": 6243, "item_name": "缤色甜梦", "type": "连衣裙", "image": ""}]}];
+const list = document.getElementById("sets-list");
+const searchInput = document.getElementById("search");
+let checked = new Set(); // item_id
+
+function escapeHtml(s) {
+  return (s || "").replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+}
+function starHtml(n) { const c = parseInt(n,10); return c ? '<span class="star">'+ "★".repeat(c) +'</span>' : ""; }
+function typeOrder(t) {
+  const order = ["发型","发饰","帽子","耳饰","面饰","颈饰","外套","上衣","连衣裙","下装","袜子","鞋子","手持物","腕饰","手套","戒指","背饰","翅膀","尾巴","悬浮","斜挎","纹身","脚链","座驾"];
+  return order.indexOf(t) >= 0 ? order.indexOf(t) : 99;
+}
+
+function render() {
+  const q = searchInput.value.trim().toLowerCase();
+  const sets = SETS.filter(s => !q || s.set_name.toLowerCase().includes(q));
+
+  list.innerHTML = sets.map((s, i) => {
+    const pct = s.total ? Math.round(s.owned_cnt / s.total * 100) : 0;
+    const ownedItems = (s.owned_items || []).slice().sort((a,b) => typeOrder(a.type) - typeOrder(b.type));
+    const missingItems = s.items.slice().sort((a,b) => typeOrder(a.type) - typeOrder(b.type));
+    return `
+      <div class="set-card" data-idx="${i}">
+        <div class="set-head">
+          <img src="${escapeHtml(s.preview || '')}" onerror="this.style.visibility='hidden'">
+          <div class="set-info">
+            <div class="set-name">${escapeHtml(s.set_name)} ${starHtml(s.star)}</div>
+            <div class="set-meta">${escapeHtml(s.attribute || '')} · 免活${s.version ? ' · v' + escapeHtml(s.version) : ''}</div>
+          </div>
+          <div class="progress">
+            <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+            <div class="progress-text">已拥有 ${s.owned_cnt} / ${s.total}</div>
+          </div>
+          <span class="set-toggle">›</span>
+        </div>
+        <div class="set-items">
+          <div class="section-label">✅ 已拥有（${ownedItems.length}）</div>
+          <div class="items-grid">
+            ${ownedItems.map(it => `
+              <div class="item-row owned">
+                <span class="owned-check">✓</span>
+                <img src="${escapeHtml(it.image || '')}" data-full="${escapeHtml(it.image || '')}" onerror="this.style.visibility='hidden'">
+                <span class="item-name">${escapeHtml(it.item_name)}</span>
+                <span class="item-type">${escapeHtml(it.type || '')}</span>
+              </div>
+            `).join("")}
+          </div>
+          <div class="section-label">⬜ 缺失（${missingItems.length}）</div>
+          <div class="items-grid">
+            ${missingItems.map(it => `
+              <div class="item-row">
+                <input type="checkbox" ${checked.has(it.item_id) ? "checked" : ""} data-id="${it.item_id}">
+                <img src="${escapeHtml(it.image || '')}" data-full="${escapeHtml(it.image || '')}" onerror="this.style.visibility='hidden'">
+                <span class="item-name">${escapeHtml(it.item_name)}</span>
+                <span class="item-type">${escapeHtml(it.type || '')}</span>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+      </div>`;
+  }).join("");
+
+  // 展开/收起
+  list.querySelectorAll(".set-head").forEach(h => {
+    h.addEventListener("click", () => h.parentElement.classList.toggle("open"));
+  });
+  // 图片放大
+  list.querySelectorAll(".item-row img").forEach(img => {
+    img.addEventListener("click", e => {
+      e.stopPropagation();
+      $("#zoom-img").src = img.dataset.full || img.src;
+      $("#zoom-mask").classList.add("show");
+    });
+  });
+  // 勾选
+  list.querySelectorAll(".item-row input").forEach(cb => {
+    cb.addEventListener("change", () => {
+      const id = parseInt(cb.dataset.id, 10);
+      if (cb.checked) checked.add(id); else checked.delete(id);
+      updateStat();
+    });
+  });
+
+  document.getElementById("total-sets").textContent = sets.length;
+  updateStat();
+}
+
+function updateStat() {
+  document.getElementById("total-items").textContent = SETS.reduce((n,s)=>n+s.items.length,0);
+  document.getElementById("stat").textContent = `勾选 ${checked.size} 件`;
+}
+
+// 整套标记齐全
+document.getElementById("btn-own-all").addEventListener("click", () => {
+  list.querySelectorAll(".set-card.open").forEach(card => {
+    card.querySelectorAll(".item-row input").forEach(cb => {
+      cb.checked = true;
+      checked.add(parseInt(cb.dataset.id, 10));
+    });
+  });
+  updateStat();
+});
+
+// 标记勾选为已拥有
+document.getElementById("btn-mark").addEventListener("click", async () => {
+  if (checked.size === 0) { alert("请先勾选要标记的部件（可展开套装或点「整套标记齐全」）"); return; }
+  if (!confirm(`确认将 ${checked.size} 个部件标记为「已拥有」？`)) return;
+  let ok = 0, fail = 0;
+  for (const id of checked) {
+    const r = await fetch("/api/owned", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ item_id: id, owned: 1 })
+    });
+    if (r.ok) ok++; else fail++;
+  }
+  alert(`标记完成：成功 ${ok}，失败 ${fail}。刷新页面查看更新。`);
+  checked.clear();
+  render();
+});
+
+searchInput.addEventListener("input", render);
+document.getElementById("zoom-mask").addEventListener("click", () => $("#zoom-mask").classList.remove("show"));
+
+render();
+</script>
+</body>
+</html>

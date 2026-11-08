@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>登录 - 衣橱管理</title>
+  <style>
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#1f2230;color:#eee;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
+    .box{background:#2a2e40;padding:32px 40px;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.4);width:300px}
+    h2{margin:0 0 18px;font-size:20px;text-align:center}
+    input{width:100%;padding:10px;margin:8px 0;border:1px solid #444;border-radius:8px;background:#1f2230;color:#eee;box-sizing:border-box}
+    button{width:100%;padding:10px;margin-top:12px;border:0;border-radius:8px;background:#6c5ce7;color:#fff;font-size:15px;cursor:pointer}
+    .err{color:#ff7675;font-size:13px;text-align:center;margin-top:8px;min-height:16px}
+  </style>
+</head>
+<body>
+  <form class="box" method="post" action="/login">
+    <h2>衣橱管理 · 登录</h2>
+    <input type="password" name="password" placeholder="请输入访问口令" autofocus>
+    <button type="submit">进入</button>
+    <div class="err">{{ error or '' }}</div>
+  </form>
+</body>
+</html>

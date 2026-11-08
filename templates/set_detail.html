@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ s.name }} · 套装详情</title>
+<style>
+  :root { --primary:#a67a32; --bg:#f4f1ea; --border:#e5dfd0; --text:#2c2b28; --muted:#8a8578; --owned-border:#cfe3c8; --owned-bg:#f2f7ef; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif; background:var(--bg); color:var(--text); padding:20px; }
+  a.back { display:inline-block; margin-bottom:16px; color:var(--primary); text-decoration:none; font-size:14px; }
+  .wrap { max-width:1100px; margin:0 auto; }
+  .layout { display:flex; gap:20px; align-items:flex-start; }
+  .left { flex:0 0 320px; position:sticky; top:20px; }
+  .left img.preview { width:100%; border-radius:12px; background:#fff; border:1px solid var(--border); object-fit:contain; }
+  .left h1 { font-size:20px; margin:12px 0 6px; }
+  .left .meta { font-size:13px; color:var(--muted); }
+  .right { flex:1; min-width:0; }
+  .right h2 { font-size:15px; color:var(--muted); margin-bottom:12px; }
+  .items { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:12px; }
+  .item { position:relative; background:#fff; border:1px solid var(--border); border-radius:12px; padding:8px; display:flex; flex-direction:column; align-items:center; transition:.15s; }
+  .item.owned { border-color:var(--owned-border); background:var(--owned-bg); }
+  .item img { width:100%; height:130px; object-fit:contain; border-radius:8px; cursor:pointer; background:#faf8f3; }
+  .item .name { font-size:13px; font-weight:600; margin-top:6px; text-align:center; }
+  .item .type { font-size:11px; color:var(--muted); }
+  .heart { position:absolute; top:8px; right:8px; width:28px; height:28px; border-radius:50%; border:none; background:rgba(255,255,255,.9); font-size:16px; cursor:pointer; color:#ccc; line-height:1; }
+  .heart.wished { color:#e67e22; }
+  .owned-toggle { margin-top:6px; font-size:11px; color:var(--muted); display:flex; align-items:center; gap:4px; cursor:pointer; }
+  .f-badge { position:absolute; left:6px; top:6px; background:rgba(166,122,50,.92); color:#fff; font-size:10px; padding:2px 7px; border-radius:10px; cursor:pointer; z-index:2; letter-spacing:.4px; line-height:1.4; }
+  /* 大图预览 + 多形态左右切换 */
+  .img-mask{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;display:none;align-items:center;justify-content:center;padding:30px;cursor:zoom-out;}
+  .img-mask.show{display:flex;}
+  .img-mask img{max-width:94vw;max-height:94vh;object-fit:contain;border-radius:8px;}
+  .img-nav{position:absolute;top:50%;transform:translateY(-50%);width:46px;height:46px;border-radius:50%;border:none;background:rgba(0,0,0,.45);color:#fff;font-size:28px;line-height:44px;text-align:center;padding:0;cursor:pointer;display:none;z-index:2;}
+  .img-nav:hover{background:rgba(0,0,0,.72);}
+  .img-nav.show{display:block;}
+  .img-nav.prev{left:20px;}
+  .img-nav.next{right:20px;}
+  .img-counter{position:absolute;bottom:24px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.55);color:#fff;font-size:13px;padding:5px 14px;border-radius:14px;display:none;z-index:2;letter-spacing:.5px;}
+  .img-counter.show{display:block;}
+  @media (max-width:720px){
+    body{ padding:12px; }
+    .wrap{ max-width:100%; }
+    .layout{flex-direction:column; gap:12px;} .left{position:static; flex:none; width:100%;}
+    .right h2{ font-size:14px; }
+    .items{ grid-template-columns:repeat(2,1fr); gap:8px; }
+    .item{ padding:6px; border-radius:10px; }
+    .item img{ height:108px; }
+    .item .name{ font-size:12px; }
+    .heart{ width:24px; height:24px; font-size:14px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="{% if request.args.get('from')=='wishlist' %}/wishlist{% elif request.args.get('from')=='recognize' %}/recognize{% else %}/{% endif %}" onclick="return goBack(this)">← 返回</a>
+  <div class="layout">
+    <div class="left">
+      {% if s.preview %}<img class="preview" src="{{ s.preview }}" alt="{{ s.name }}">{% endif %}
+      <h1>{{ s.name }}{% if s.alias %} <span style="font-size:14px;color:var(--muted);">（{{ s.alias }}）</span>{% endif %}</h1>
+      <div class="meta">
+        <div>{{ s.star }} 星 · {{ s.obtain or '未知来源' }}</div>
+        {% if s.attribute %}<div>风格：{{ s.attribute }}</div>{% endif %}
+      </div>
+    </div>
+    <div class="right">
+      <h2>部件列表（{{ items|length }}）</h2>
+      <div class="items">
+        {% for i in items %}
+        <div class="item {% if i.owned %}owned{% endif %}" data-itemid="{{ i.id }}">
+          {% if i.image %}<img src="{{ i.image }}" loading="lazy" alt="{{ i.name }}" data-name="{{ i.name }}" data-full="{{ i.image_big or i.image }}" data-forms='{{ i.forms|tojson }}' onclick="openItemImage(this)" title="{% if i.forms|length > 1 %}该部件有 {{ i.forms|length }} 个形态，点击查看{% else %}查看大图{% endif %}">{% endif %}
+          {% if i.forms|length > 1 %}<span class="f-badge" onclick="openItemImage(this.parentNode.querySelector('img'))" title="有 {{ i.forms|length }} 个形态">×{{ i.forms|length }} 形态</span>{% endif %}
+          <div class="name">{{ i.name }}</div>
+          <div class="type">{{ i.type }}</div>
+          <button class="heart {% if i.id in wished %}wished{% endif %}" data-itemid="{{ i.id }}" title="收藏到心愿单">{% if i.id in wished %}★{% else %}☆{% endif %}</button>
+          <label class="owned-toggle"><input type="checkbox" {% if i.owned %}checked{% endif %} style="accent-color:var(--primary);"> 已拥有</label>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+<!-- 大图查看（多形态时左右切换） -->
+<div class="img-mask" id="img-mask">
+  <button class="img-nav prev" id="img-prev" title="上一个形态（← 或点图片左半区）">‹</button>
+  <img id="img-big" src="" alt="">
+  <button class="img-nav next" id="img-next" title="下一个形态（→ 或点图片右半区）">›</button>
+  <div class="img-counter" id="img-counter"></div>
+</div>
+<script>
+// 统一返回：同站来源优先回上一个页面，否则走链接 href（?from=）兜底
+function goBack(a) {
+  try {
+    const params = new URLSearchParams(location.search);
+    const from = params.get("from");
+    if (from === "recognize") { location.href = "/recognize"; return false; }
+    if (from === "wishlist") { location.href = "/wishlist"; return false; }
+    if (document.referrer && new URL(document.referrer).origin === location.origin) {
+      history.back();
+      return false;
+    }
+  } catch (e) {}
+  return true;
+}
+
+function openBig(url){ window.open(url, "_blank"); }
+// ---- 大图预览 + 多形态左右切换（outfit_item_forms） ----
+// FORM_VIEW 非空且 forms>1 时启用左右切换：箭头 / 键盘 ←→ / 点击图片左、右半区
+let FORM_VIEW = null;
+
+// 部件图/角标点击：多形态 → 大图预览可左右切换；单形态 → 普通大图
+function openItemImage(img){
+  if (!img) return;
+  let forms = [];
+  try { const f = JSON.parse(img.dataset.forms || "[]"); forms = Array.isArray(f) ? f : []; } catch (e) {}
+  if (forms.length > 0) { openForms(img.dataset.name || "", forms); return; }
+  openBig(img.dataset.full || img.src);
+}
+
+function openForms(name, forms){
+  if (!forms || !forms.length) return;
+  FORM_VIEW = { name: name || "", forms: forms, idx: 0 };
+  renderFormView();
+  document.getElementById("img-mask").classList.add("show");
+}
+
+function renderFormView(){
+  const multi = !!(FORM_VIEW && FORM_VIEW.forms.length > 1);
+  const main = document.getElementById("img-big");
+  if (FORM_VIEW) {
+    const f = FORM_VIEW.forms[FORM_VIEW.idx];
+    main.src = f.image_big || f.image || "";
+  }
+  document.getElementById("img-prev").classList.toggle("show", multi);
+  document.getElementById("img-next").classList.toggle("show", multi);
+  const counter = document.getElementById("img-counter");
+  counter.classList.toggle("show", multi);
+  if (multi) {
+    counter.textContent = (FORM_VIEW.name ? FORM_VIEW.name + " · " : "") +
+      "形态 " + (FORM_VIEW.idx + 1) + "/" + FORM_VIEW.forms.length;
+  }
+  main.style.cursor = multi ? "pointer" : "default";
+}
+
+function stepForm(delta){
+  if (!FORM_VIEW || FORM_VIEW.forms.length < 2) return;
+  const n = FORM_VIEW.forms.length;
+  FORM_VIEW.idx = (FORM_VIEW.idx + delta + n) % n;
+  renderFormView();
+}
+
+function closeBigImage(){
+  document.getElementById("img-mask").classList.remove("show");
+  document.getElementById("img-big").src = "";
+  FORM_VIEW = null;
+  renderFormView();
+}
+
+(function(){
+  const mask = document.getElementById("img-mask");
+  if (!mask) return;
+  document.getElementById("img-prev").addEventListener("click", (e) => { e.stopPropagation(); stepForm(-1); });
+  document.getElementById("img-next").addEventListener("click", (e) => { e.stopPropagation(); stepForm(1); });
+  document.getElementById("img-counter").addEventListener("click", (e) => e.stopPropagation());
+  // 点击大图左半区 → 上一个形态；右半区 → 下一个形态
+  document.getElementById("img-big").addEventListener("click", (e) => {
+    e.stopPropagation();
+    const r = e.currentTarget.getBoundingClientRect();
+    stepForm(e.clientX < r.left + r.width / 2 ? -1 : 1);
+  });
+  mask.addEventListener("click", (e) => { if (e.target === mask) closeBigImage(); });
+  document.addEventListener("keydown", (e) => {
+    if (!mask.classList.contains("show")) return;
+    if (e.key === "Escape") closeBigImage();
+    else if (e.key === "ArrowLeft") { e.preventDefault(); stepForm(-1); }
+    else if (e.key === "ArrowRight") { e.preventDefault(); stepForm(1); }
+  });
+})();
+document.querySelectorAll(".heart").forEach(btn => {
+  btn.addEventListener("click", async () => {
+    const itemId = parseInt(btn.dataset.itemid, 10);
+    const res = await fetch("/api/wishlist/toggle", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({ item_id: itemId })
+    });
+    const data = await res.json();
+    btn.classList.toggle("wished", data.in_wishlist);
+    btn.textContent = data.in_wishlist ? "★" : "☆";
+  });
+});
+document.querySelectorAll(".owned-toggle input").forEach(cb => {
+  cb.addEventListener("change", async () => {
+    const itemId = parseInt(cb.closest(".item").dataset.itemid, 10);
+    const owned = cb.checked ? 1 : 0;
+    await fetch("/api/owned", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({ item_id: itemId, owned: owned })
+    });
+    cb.closest(".item").classList.toggle("owned", cb.checked);
+  });
+});
+</script>
+</body>
+</html>

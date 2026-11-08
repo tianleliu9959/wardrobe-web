@@ -1,0 +1,1977 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 识别</title>
+<style>
+  :root { --primary:#a67a32; --bg:#f4f1ea; --border:#e5dfd0; --text:#2c2b28; --muted:#8a8578; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif; background:var(--bg); color:var(--text); height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+  .topbar { padding:14px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:16px; background:#fff; flex-shrink:0; }
+  .topbar a { color:var(--primary); text-decoration:none; font-size:14px; }
+  .topbar h1 { font-size:18px; font-weight:600; }
+  .layout { flex:1; display:flex; min-width:0; min-height:0; }
+  /* Tab 页面切换 */
+  .tab-pane { display:none; min-width:0; min-height:0; }
+  .tab-pane.active { display:flex; }
+  #pane-recognize.active { flex:1; display:grid; grid-template-columns:370px 1fr; min-height:0; }
+  #pane-history.active { flex:1; flex-direction:column; min-height:0; }
+  .tabs { display:flex; gap:4px; margin-left:auto; }
+  .tab { border:none; background:transparent; padding:7px 16px; font-size:14px; cursor:pointer; border-radius:8px; color:var(--muted); font-family:inherit; width:auto; }
+  .tab:hover { background:#f5f0e6; color:var(--text); }
+  .tab.active { background:var(--primary); color:#fff; font-weight:600; }
+  .tab .count { font-size:11px; opacity:.85; font-weight:400; margin-left:2px; }
+  .col { overflow-y:auto; padding:16px; min-height:0; }
+  .col-left { background:#fff; border-right:1px solid var(--border); }
+  .col-mid { background:var(--bg); }
+  .col-history { flex:1; overflow-y:auto; padding:16px; min-height:0; background:#fff; }
+  /* 历史日志网格：按容器宽度自适应列数（每列 ≥300px，宽屏3列/中屏2列/窄屏1列），行内等高、底部对齐 */
+  #history { display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:18px; align-items:stretch; }
+  .log-item { min-width:0; min-height:180px; display:flex; flex-direction:column; }
+  .col-head { font-size:14px; font-weight:600; margin-bottom:12px; color:var(--text); display:flex; align-items:center; justify-content:space-between; }
+  .col-head .count { font-size:12px; color:var(--muted); font-weight:400; }
+  /* 历史页搜索 */
+  .hist-toolbar { margin-bottom:12px; }
+  .hist-toolbar input { width:100%; border:1px solid var(--border); border-radius:8px; padding:8px 12px; font-size:13px; }
+  /* 底部固定操作栏：步骤条 + 当前状态主按钮，永远可见 */
+  .bottom-dock { flex-shrink:0; background:#fff; border-top:1px solid var(--border); padding:10px 20px; display:flex; flex-direction:column; gap:8px; }
+  .bottom-dock .stepper { margin-bottom:0; }
+  .dock-btns { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; align-items:center; }
+  .dock-btns button { width:auto; padding:8px 20px; font-size:13px; }
+  .dock-btns .danger { background:#c0392b; color:#fff; border-color:#c0392b; }
+  .dock-btns .run-precise-btn { padding:8px 20px; font-size:13px; }
+  .dock-btns .go-wishlist { margin-left:4px; }
+
+  .form-row { margin-bottom:12px; }
+  .form-row label { font-size:13px; color:var(--muted); display:block; margin-bottom:4px; }
+  select { width:100%; border:1px solid var(--border); border-radius:8px; padding:7px 10px; font-size:13px; background:#fff; }
+  .drop-zone { border:2px dashed var(--border); border-radius:12px; padding:20px; text-align:center; cursor:pointer; background:#faf8f3; color:var(--muted); transition:.15s; }
+  .drop-zone:hover { border-color:var(--primary); }
+  .drop-zone img { width:100%; max-width:300px; aspect-ratio:9 / 19.5; object-fit:contain;
+                   border-radius:8px; margin-top:10px; background:#111; }
+  .phone-frame { display:flex; flex-direction:column; align-items:center; }
+  .cache-tip { font-size:12px; color:var(--muted); margin-top:8px; }
+  button { border:1px solid var(--border); background:#fff; border-radius:8px; padding:9px 18px; font-size:14px; cursor:pointer; width:100%; }
+  button.primary { background:var(--primary); color:#fff; border-color:var(--primary); font-weight:600; }
+  button:disabled { opacity:0.4; cursor:not-allowed; }
+  #btn-start { margin-top:14px; }
+  /* 日志"查看详情"按钮：<a> / <button> 双标签统一样式 */
+  .hist-btn { display:inline-block; width:auto; border:1px solid var(--border); background:#fff; color:var(--text); border-radius:6px; padding:4px 14px; font-size:12px; line-height:1.5; text-decoration:none; cursor:pointer; font-family:inherit; }
+  .hist-btn:hover { border-color:var(--primary); color:var(--primary); background:#faf8f3; }
+
+  .cand-grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:12px; }
+  .cand { display:flex; flex-direction:row; gap:12px; padding:12px; border:1px solid var(--border); border-radius:12px; background:#fff; align-items:flex-start; }
+  .cand img.preview { width:90px; height:auto; max-height:150px; object-fit:contain; border-radius:8px; background:#faf8f3; cursor:zoom-in; flex-shrink:0; }
+  .cand .info { flex:1; min-width:0; display:flex; flex-direction:column; gap:6px; }
+  .cand .name { font-weight:600; font-size:14px; }
+  .cand .name .alias { font-weight:400; font-size:12px; color:var(--muted); }
+  .cand .meta { font-size:12px; color:var(--muted); }
+  .cand.hit { border:2px solid #2e7d32; background:#e8f5e9; box-shadow:0 0 0 2px rgba(46,125,50,.15); }
+  .cand.hit .name { color:#1b5e20; }
+  .cand.dim { opacity:0.55; }
+  .cand .cand-top { display:flex; align-items:center; gap:6px; }
+  .cand .cand-actions { display:flex; align-items:center; gap:6px; margin-top:auto; }
+  .cand .cand-actions button { width:auto; padding:4px 10px; font-size:12px; }
+  .hit-badge { display:inline-block; padding:2px 10px; border-radius:10px; font-size:11px; margin-left:6px; background:#2e7d32; color:#fff; font-weight:600; }
+  .heart-btn { color:#c0392b; border:none; background:transparent; font-size:18px; padding:0 4px; width:auto; }
+  .heart-btn.on { color:#c0392b; }
+  /* 套装按钮：描边次色，表示"查看类"动作 */
+  .goto-set { color:var(--primary); border:1px solid var(--primary); background:#fff; border-radius:8px; padding:4px 10px; font-size:12px; width:auto; }
+  .goto-set:hover { background:#f3eee2; }
+  /* 接着跑精排：主色实底，强调"下一步主动作"，与心标/套装明显区分 */
+  .run-precise-btn { background:var(--primary); color:#fff; border:1px solid var(--primary); border-radius:8px; font-weight:600; }
+  .run-precise-btn:hover { filter:brightness(1.05); }
+  .cand input[type=checkbox] { width:17px; height:17px; accent-color:var(--primary); flex-shrink:0; }
+  .badge { display:inline-block; padding:1px 8px; border-radius:10px; font-size:11px; margin-left:6px; background:#f0ebe0; }
+  .empty { color:var(--muted); padding:30px; text-align:center; font-size:13px; }
+
+  /* ===== 历史日志卡片（重新设计：头部 / top1高亮 / 列表 / 底部meta 四层） ===== */
+  .log-item { border:1px solid var(--border); border-radius:10px; padding:10px 12px; background:#fff; font-size:12px; transition:border-color .15s, box-shadow .15s; }
+  .log-item:hover { border-color:var(--primary); box-shadow:0 2px 12px rgba(198,156,73,.14); }
+  .log-head { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  .log-time { font-weight:600; font-size:12.5px; }
+  .log-kind { border-radius:5px; padding:0 6px; font-size:11px; line-height:17px; }
+  .log-kind.precise { background:var(--primary); color:#fff; }
+  .log-kind.coarse { background:#f3eee2; color:var(--primary); }
+  .log-id { margin-left:auto; border:1px solid var(--primary); color:var(--primary); border-radius:5px; padding:0 7px; font-size:11px; line-height:17px; cursor:pointer; user-select:none; transition:.15s; }
+  .log-id:hover { background:var(--primary); color:#fff; }
+  /* top1 高亮行：浅底色块 + 金色相似度 */
+  .log-top1 { display:flex; align-items:center; gap:6px; margin-top:8px; padding:6px 9px; background:#faf8f3; border:1px solid #f0e8d8; border-radius:8px; flex-wrap:wrap; }
+  .log-top1 .label { color:var(--muted); font-size:11px; }
+  .log-top1 .name { font-weight:700; font-size:13px; }
+  .log-top1 .sim { margin-left:auto; color:var(--primary); font-weight:700; font-size:12.5px; }
+  .log-thumb { display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; }
+  .log-thumb img { width:56px; height:56px; object-fit:cover; border-radius:6px; border:1px solid var(--border); cursor:zoom-in; background:#faf8f3; }
+  .log-top-list { margin-top:6px; }
+  .log-top-row { display:flex; align-items:center; gap:6px; flex-wrap:wrap; padding:2px 0; }
+  .log-top-row .name { font-weight:600; }
+  .log-top-row .alias { font-weight:400; font-size:12px; color:var(--muted); }
+  .log-top-row .sim { margin-left:auto; color:var(--muted); }
+  .log-more { color:var(--muted); font-size:11px; padding:2px 0; }
+  /* 底部 meta：次要信息灰字一行，虚线分隔，按钮右对齐；flex 贴底保证行内等高 */
+  .log-meta { margin-top:auto; padding-top:8px; border-top:1px dashed var(--border); display:flex; align-items:center; gap:10px; flex-wrap:wrap; color:var(--muted); font-size:11.5px; }
+  .log-meta .hit-line { color:#2e7d32; }
+  .log-meta .hist-btn { margin-left:auto; }
+  /* ===== 历史日志分页 ===== */
+  .hist-pager { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:6px; padding:14px 0 4px; }
+  .hist-pager .pg-info { font-size:12px; color:var(--muted); margin-right:8px; }
+  .hist-pager button { width:auto; min-width:32px; height:32px; padding:0 10px; font-size:12.5px; border-radius:6px; line-height:1; }
+  .hist-pager button.active { background:var(--primary); color:#fff; border-color:var(--primary); font-weight:600; }
+  .hist-pager button:disabled { opacity:.4; cursor:not-allowed; }
+
+  .lightbox { position:fixed; inset:0; background:rgba(0,0,0,.8); display:none; align-items:center; justify-content:center; z-index:100; }
+  .lightbox.show { display:flex; }
+  .lightbox img { max-width:92vw; max-height:92vh; object-fit:contain; border-radius:8px; background:#111; }
+  .loose-tag { color:#b8860b; font-weight:600; }
+  .loose-link { cursor:pointer; border-bottom:1px dashed #d4a94e; }
+  .loose-link:hover { color:var(--primary); border-bottom-style:solid; }
+
+  /* 内容级弹窗（详情 / 套装），置于 lightbox 之下。用 cmodal 前缀避免与既有 .modal 弹窗体系冲突 */
+  .cmodal { position:fixed; inset:0; background:rgba(0,0,0,.55); display:none; align-items:center; justify-content:center; z-index:90; }
+  .cmodal.show { display:flex; }
+  .cmodal-box { background:#fff; border-radius:12px; width:min(1100px, 94vw); max-height:86vh;
+                display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,.3); }
+  .cmodal-head { padding:12px 16px; border-bottom:1px solid var(--border); display:flex;
+                 justify-content:space-between; align-items:center; flex-shrink:0; }
+  .cmodal-head .title { font-size:15px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .cmodal-close { border:none; background:transparent; font-size:22px; line-height:1; cursor:pointer;
+                  color:var(--muted); width:auto; padding:0 6px; }
+  .cmodal-close:hover { color:var(--text); }
+  .cmodal-body { flex:1; overflow-y:auto; padding:16px; min-height:0; }
+  .cmodal-body .empty { padding:40px 0; text-align:center; color:var(--muted); }
+  /* 套装弹窗网格（与套装页同款响应式） */
+  .set-items { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:12px; }
+  .set-item { position:relative; background:#fff; border:1px solid var(--border); border-radius:12px;
+              padding:8px; display:flex; flex-direction:column; align-items:center; }
+  .set-item.owned { border-color:#cfe3c8; background:#f2f7ef; }
+  .set-item img { width:100%; height:130px; object-fit:contain; border-radius:8px; cursor:zoom-in; background:#faf8f3; }
+  .set-item .name { font-size:13px; font-weight:600; margin-top:6px; text-align:center; }
+  .set-item .type { font-size:11px; color:var(--muted); }
+  .set-item .heart-btn { position:absolute; top:8px; right:8px; width:28px; height:28px; border-radius:50%;
+                         background:rgba(255,255,255,.92); border:1px solid var(--border); font-size:16px; line-height:1; }
+  .set-item .owned-toggle { margin-top:6px; font-size:11px; color:var(--muted); display:flex; align-items:center; gap:4px; cursor:pointer; }
+
+  /* 裁剪预览区（框选编辑） */
+  .crop-panel { border:1px solid var(--border); border-radius:12px; padding:12px; background:#fff; margin-bottom:12px; }
+  .crop-panel .crop-main { display:flex; gap:12px; align-items:flex-start; justify-content:center; }
+  .crop-stage-wrap { position:relative; flex:none; width:220px; height:300px; background:#111; border-radius:8px; overflow:auto; }
+  .crop-stage-wrap img { display:block; height:100%; width:auto; }
+  /* 缩放控件：贴舞台左上角，滚动时保持可见 */
+  .crop-zoom { position:sticky; top:6px; left:6px; display:flex; gap:4px; align-items:center; width:max-content;
+               padding:3px 6px; background:rgba(0,0,0,.55); border-radius:6px; z-index:5; }
+  .crop-zoom button { width:22px; height:22px; line-height:1; padding:0; border:0; border-radius:4px;
+                      background:rgba(255,255,255,.18); color:#fff; cursor:pointer; font-size:14px; }
+  .crop-zoom button:hover { background:rgba(255,255,255,.35); }
+  .crop-zoom span { color:#fff; font-size:11px; min-width:40px; text-align:center; }
+  .crop-stage-wrap.drawing { cursor:crosshair; }
+  .crop-box { position:absolute; border:2px solid rgba(166,122,50,.95); background:rgba(166,122,50,.08); box-sizing:border-box; cursor:move; z-index:2; }
+  .crop-box.editing { border-color:#2e7d32; background:rgba(46,125,50,.12); }
+  .crop-handle { position:absolute; width:12px; height:12px; background:#fff; border:2px solid var(--primary); border-radius:3px; z-index:3; }
+  .crop-handle.tl { top:-7px; left:-7px; cursor:nwse-resize; }
+  .crop-handle.tr { top:-7px; right:-7px; cursor:nesw-resize; }
+  .crop-handle.bl { bottom:-7px; left:-7px; cursor:nesw-resize; }
+  .crop-handle.br { bottom:-7px; right:-7px; cursor:nwse-resize; }
+  .crop-thumb { width:110px; flex-shrink:0; text-align:center; font-size:12px; color:var(--muted); }
+  .crop-thumb img { width:100%; border-radius:6px; border:1px solid var(--border); background:#faf8f3; cursor:zoom-in; }
+  .crop-bar { display:flex; align-items:center; justify-content:center; gap:10px; margin-top:10px; flex-wrap:wrap; }
+  .crop-coord { font-size:12px; color:var(--muted); font-family:monospace; }
+  .crop-btns { display:flex; gap:8px; flex-wrap:wrap; }
+  .crop-btns button { width:auto; padding:5px 14px; font-size:12px; }
+  .crop-btns .danger { background:#c0392b; color:#fff; border-color:#c0392b; }
+  .crop-tip { font-size:12px; color:var(--muted); margin-top:6px; }
+  /* 裁剪预览折叠：粗排/精排完成后收起，把空间让给结果列表 */
+  .crop-panel.collapsed .crop-main { display:none; }
+  .crop-panel.collapsed .crop-tip { display:none; }
+  .crop-panel.collapsed { padding:8px 12px; }
+  .crop-toggle { border:1px solid var(--border); background:#fff; color:var(--text); border-radius:6px; padding:1px 10px; font-size:12px; cursor:pointer; font-family:inherit; line-height:1.5; white-space:nowrap; flex-shrink:0; }
+  .crop-toggle:hover { border-color:var(--primary); color:var(--primary); }
+  /* ---- AI 识别多状态步骤条 ---- */
+  .stepper { display:flex; align-items:center; margin-bottom:12px; padding:8px 12px; background:#fff; border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+  .stepper .step { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); white-space:nowrap; flex-shrink:0; }
+  .stepper .step .dot { width:20px; height:20px; border-radius:50%; background:#ece7db; color:var(--muted); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; flex-shrink:0; transition:.2s; }
+  .stepper .step .label { transition:.2s; }
+  .stepper .step::after { content:""; flex:1 1 auto; min-width:12px; height:2px; background:var(--border); margin:0 8px; border-radius:1px; transition:.2s; }
+  .stepper .step:last-child::after { display:none; }
+  .stepper .step.done .dot { background:#2e7d32; color:#fff; }
+  .stepper .step.done .label { color:#2e7d32; }
+  .stepper .step.done::after { background:#2e7d32; }
+  .stepper .step.active .dot { background:var(--primary); color:#fff; animation:pulse 1.4s ease-in-out infinite; }
+  .stepper .step.active .label { color:var(--primary); font-weight:700; }
+  .stepper .step.error .dot { background:#c0392b; color:#fff; }
+  .stepper .step.error .label { color:#c0392b; font-weight:700; }
+  @keyframes pulse { 0%,100% { box-shadow:0 0 0 0 rgba(166,122,50,.35); } 50% { box-shadow:0 0 0 6px rgba(166,122,50,0); } }
+  .spinner { display:inline-block; width:13px; height:13px; border:2px solid var(--border); border-top-color:var(--primary); border-radius:50%; animation:spin .8s linear infinite; vertical-align:-2px; margin-right:6px; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  /* ================= 手机端（窄屏）自适应：同 WiFi 下手机浏览器友好使用 ================= */
+  /* 仅在窄屏生效；桌面端保持原双栏布局不变 */
+  @media (max-width: 768px) {
+    body { overflow:auto; padding-bottom:120px; }    /* 手机允许整页滚动，不锁死高度；底部留白给固定 dock */
+    .topbar { padding:12px 14px; gap:10px; position:sticky; top:0; z-index:20; }
+    .topbar h1 { font-size:16px; }
+    .layout { display:block; }                       /* 双栏 → 单栏纵向堆叠 */
+    .tab-pane.active { display:block !important; }
+    #pane-recognize.active { display:block !important; grid-template-columns:none; }
+    .col { overflow:visible; padding:14px; }
+    .col-left { border-right:none; border-bottom:1px solid var(--border); }
+    .col-mid { background:#fff; }
+
+    /* 部位选择 + 上传区：大号、易点 */
+    .form-row label { font-size:15px; margin-bottom:6px; }
+    select { padding:12px; font-size:16px; }          /* 16px 防止 iOS 聚焦缩放 */
+    .drop-zone { padding:28px 16px; font-size:15px; }
+    .drop-zone.disabled { opacity:.45; background:#f3f3f5; cursor:not-allowed; }
+    .drop-zone img { max-width:100%; }
+    #btn-start { padding:14px; font-size:16px; margin-top:14px; border-radius:10px; }
+    .cache-tip { font-size:13px; }
+
+    /* 结果卡片单列大图 */
+    .cand-grid { grid-template-columns:1fr; gap:14px; }
+    .cand { padding:14px; }
+    .cand img.preview { width:110px; }
+    .cand .name { font-size:16px; }
+    .cand .meta { font-size:13px; }
+
+    /* 底部操作栏：手机上固定贴底，按钮大一点 */
+    .bottom-dock { position:fixed; left:0; right:0; bottom:0; z-index:30; padding:10px 14px; gap:6px; box-shadow:0 -2px 10px rgba(0,0,0,.06); }
+    .stepper { overflow-x:auto; padding:6px 8px; font-size:11px; -webkit-overflow-scrolling:touch; }
+    .stepper .step .label { font-size:11px; }
+    /* 操作按钮：手机端横向不换行，超出可滑动，避免"粗排重新剪裁接着跑精排"挤成多行 */
+    .dock-btns { flex-wrap:nowrap; overflow-x:auto; justify-content:flex-start; -webkit-overflow-scrolling:touch; padding-bottom:2px; }
+    .dock-btns button { white-space:nowrap; flex:0 0 auto; }
+    .dock-btns button { padding:12px 18px; font-size:15px; }
+    /* 裁剪预览：手机端默认限高、纵向堆叠，避免原图（9:19.5 截图）撑爆整屏 */
+    .crop-panel { margin-bottom:14px; }
+    .crop-panel .crop-main { display:block; max-width:100%; }
+    .crop-stage-wrap { width:100%; max-width:100%; height:auto; max-height:50vh; overflow:auto; box-sizing:border-box; }
+    .crop-stage-wrap img { height:auto; width:100%; max-width:100%; display:block; }
+    .crop-thumb { width:100%; }
+    .crop-thumb img { width:140px; }
+
+    /* 历史页：移动端也单列 */
+    #history { grid-template-columns:1fr; }
+    .hist-pager button { min-width:38px; height:38px; }
+
+    /* 顶部 Tab 间距收紧 */
+    .tabs { gap:2px; }
+    .tab { padding:8px 12px; font-size:14px; }
+
+    /* 裁剪预览：展开态（非 collapsed）整体限高，内部滚动，不撑爆整屏 */
+    .crop-panel:not(.collapsed) { max-height:72vh; overflow:auto; }
+    .crop-stage-wrap { max-height:40vh; }
+    .crop-thumb { max-width:160px; margin:0 auto; }
+    .crop-thumb img { width:140px; }
+
+    /* 内容弹窗（详情/套装）：手机端接近全屏，沉浸式，header 固定 + body 滚动 */
+    .cmodal-box { width:100vw; height:100dvh; max-height:none; border-radius:0; }
+    .cmodal-head { padding:14px 16px; font-size:16px; }
+    .cmodal-close { font-size:26px; }
+    .cmodal-body { padding:14px 14px 40px; }
+    .set-items { grid-template-columns:repeat(2, 1fr); gap:10px; }
+    .set-item img { height:120px; }
+  }
+
+  /* 支持 iOS 把网页"添加到主屏幕"后隐藏地址栏、状态栏沉浸 */
+  @media (display-mode: standalone) {
+    .topbar { padding-top:max(12px, env(safe-area-inset-top)); }
+    .bottom-dock { padding-bottom:max(10px, env(safe-area-inset-bottom)); }
+  }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a href="/" onclick="return goBack(this)">← 返回</a>
+  <h1>AI 识别部件</h1>
+  <nav class="tabs">
+    <button class="tab active" data-tab="recognize">识别</button>
+    <button class="tab" data-tab="history">历史 <span class="count" id="hist-count"></span></button>
+  </nav>
+</div>
+
+<div class="layout">
+  <!-- Tab1 识别工作台：左上传 + 中结果 -->
+  <div class="tab-pane active" id="pane-recognize">
+    <div class="col col-left">
+      <div class="col-head">上传</div>
+      <div class="form-row">
+        <label>部位（必选）</label>
+        <select id="type-select"><option value="">请选择</option></select>
+      </div>
+      <div class="drop-zone" id="drop-zone">
+        <span>点击选择或拖拽衣橱截图</span>
+      </div>
+      <input type="file" id="file-input" accept="image/*" style="display:none">
+      <div class="cache-tip" id="cache-tip" style="display:none;"></div>
+      <button class="primary" id="btn-start" disabled>开始查询</button>
+    </div>
+    <div class="col col-mid">
+      <div class="col-head" id="result-head">结果</div>
+      <div id="result"><div class="empty">选择部位并上传截图后开始识别</div></div>
+    </div>
+  </div>
+
+  <!-- Tab2 历史独立子页面 -->
+  <div class="tab-pane" id="pane-history">
+    <div class="col col-history">
+      <div class="col-head">识别历史</div>
+      <div class="hist-toolbar">
+        <input type="text" id="hist-search" placeholder="按部件名/套装搜索…">
+      </div>
+      <div id="history"><div class="empty">加载中…</div></div>
+      <div id="hist-pager" class="hist-pager" style="display:none;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 底部固定操作栏：步骤条 + 当前状态主按钮，永远可见 -->
+<div class="bottom-dock">
+  <div class="stepper" id="stepper">
+    <div class="step" data-step="1"><span class="dot">1</span><span class="label">上传截图</span></div>
+    <div class="step" data-step="2"><span class="dot">2</span><span class="label">定位裁剪</span></div>
+    <div class="step" data-step="3"><span class="dot">3</span><span class="label">粗排召回</span></div>
+    <div class="step" data-step="4"><span class="dot">4</span><span class="label">精排比对</span></div>
+    <div class="step" data-step="5"><span class="dot">5</span><span class="label">关联完成</span></div>
+  </div>
+  <div class="dock-btns">
+    <button id="crop-pause" class="danger" style="display:none;">⏸ 暂停粗排</button>
+    <button id="crop-redraw" style="display:none;">✎ 重画</button>
+    <button id="crop-confirm" class="primary" style="display:none;">✓ 确认框选</button>
+    <button id="crop-cancel" style="display:none;">✕ 取消</button>
+    <button id="crop-rerun" class="primary" style="display:none;">▶ 接着跑粗排</button>
+    <button id="crop-reedit" style="display:none;">✎ 重新框选</button>
+    <button id="precise-btn" class="run-precise-btn" style="display:none;" disabled>▶ 接着跑精排</button>
+    <button id="confirm-btn" class="primary" style="display:none;" disabled>关联截图（自动加心标）</button>
+  </div>
+</div>
+
+<!-- 大图弹层 -->
+<div class="lightbox" id="lightbox"><img id="lightbox-img" alt="大图"></div>
+
+<!-- 内容级弹窗（详情 / 套装）：覆盖在识别页之上，不卸载页面 -->
+<div class="cmodal" id="cmodal">
+  <div class="cmodal-box">
+    <div class="cmodal-head">
+      <span class="title" id="cmodal-title">详情</span>
+      <button class="cmodal-close" id="cmodal-close" title="关闭">×</button>
+    </div>
+    <div class="cmodal-body" id="cmodal-body"></div>
+  </div>
+</div>
+
+<script>
+let standaloneLog = false;  // 独立日志详情页（/recognize/log/<id>）模式
+
+// ===== AI 识别多状态 UI：统一步骤条 + 标题 + 加载动画 =====
+// opts: { done(已完成步数), active(当前进行步), error(错误标红), errorStep(错误所在步), spinner(旋转动画), title(标题) }
+function setStage(opts = {}) {
+  const head = document.getElementById("result-head");
+  if (!head) return;
+  const sp = head.querySelector(".spinner");
+  if (sp) sp.remove();
+  head.textContent = opts.title || "结果";
+  if (opts.spinner) head.insertAdjacentHTML("afterbegin", '<span class="spinner"></span>');
+  document.querySelectorAll("#stepper .step").forEach((el, i) => {
+    const n = i + 1;
+    el.classList.remove("done", "active", "error");
+    if (opts.done != null && n <= opts.done) el.classList.add("done");
+    if (opts.active != null && n === opts.active) el.classList.add("active");
+  });
+  if (opts.error) {
+    const idx = opts.errorStep || opts.active || (opts.done || 0) + 1;
+    const el = document.querySelector(`#stepper .step[data-step="${idx}"]`);
+    if (el) el.classList.add("error");
+  }
+}
+setStage({ active: 1 });  // 初始：等待上传截图
+
+// ===== 手机端增强（仅在窄屏生效，不影响桌面）=====
+(function mobileEnhance(){
+  const isMobile = window.matchMedia("(max-width: 768px)").matches;
+  if (!isMobile) return;
+
+  // 1) 允许手机直接调相机拍照（capture=picture）；相册选择仍可用
+  const fileInput = document.getElementById("file");
+  if (fileInput) {
+    fileInput.setAttribute("accept", "image/*");
+    // 不强制 capture，避免只能拍照；用户可在系统弹窗选"拍照/选照片"
+  }
+
+  // 2) 选完图后，若未选部位则自动选第一个，并平滑滚到「开始识别」按钮，方便一键触发
+  if (fileInput) {
+    fileInput.addEventListener("change", () => {
+      const sel = document.getElementById("type");
+      if (sel && !sel.value && sel.options.length > 1) sel.selectedIndex = 1;
+      const startBtn = document.getElementById("btn-start");
+      if (startBtn) setTimeout(() => startBtn.scrollIntoView({behavior:"smooth", block:"center"}), 200);
+    });
+  }
+
+  // 3) 识别开始时滚到结果区，结果回来时也确保可见（手机单栏整页滚动）
+  const startBtn = document.getElementById("btn-start");
+  if (startBtn) {
+    startBtn.addEventListener("click", () => {
+      const mid = document.querySelector(".col-mid");
+      if (mid) setTimeout(() => mid.scrollIntoView({behavior:"smooth", block:"start"}), 150);
+    });
+  }
+})();
+
+// 统一返回：同站来源优先回上一个页面，否则走链接 href 兜底
+function goBack(a) {
+  try {
+    if (document.referrer && new URL(document.referrer).origin === location.origin) {
+      history.back();
+      return false;
+    }
+  } catch (e) {}
+  return true;
+}
+
+const TYPE_ORDER = {{ types | tojson }};
+const typeSel = document.getElementById("type-select");
+typeSel.innerHTML = `<option value="">请选择</option>` + TYPE_ORDER.filter(t => t).map(t => `<option value="${t}">${t}</option>`).join("");
+
+const dropZone = document.getElementById("drop-zone");
+const fileInput = document.getElementById("file-input");
+let pickedFile = null;
+let lastFileName = null;   // 已上传原图文件名（一张图查多个部位复用）
+let lastCoarse = null;     // 最近一次粗排结果（供精排复用）
+let lastCropFile = null;   // 最近一次裁剪图文件名
+let recognizing = false;   // 是否正在识别（粗排/精排）
+let associating = false;   // 是否正在关联截图（自动加心标循环）
+let lastResultData = null; // 最近一次识别结果（供"返回"按钮回显）
+
+// ---- 裁剪/框选状态机 ----
+// idle | cropping(裁剪请求中) | locating(粗排运行中,可暂停) | editing(框选编辑) | rerun_ready(手动框待确认,点按钮跑粗排) | ready(粗排完成)
+let cropPhase = "idle";
+let cropBox = null;        // 归一化框 [x1,y1,x2,y2]（0-1000）
+let cropFile = null;       // 当前裁剪图文件名
+let cropTaskId = null;     // 当前粗排/精排后台任务 id
+let _taskCancelFlag = false;  // 本地取消标志（暂停粗排，告知轮询尽快退出）
+let _pollTimer = null;     // 任务轮询定时器
+let cropOrigFile = null;   // 当前原图文件名
+let cropTypes = "";        // 当前部位
+let cropCached = false;    // 当前裁剪是否命中灰度缓存
+let cropEditBox = null;    // 编辑中的像素框 {x,y,w,h}（相对原图显示区）
+let cropZoom = 1;          // 裁剪预览图片缩放倍率（1 = 适配舞台高度 300px）
+
+dropZone.addEventListener("click", () => {
+  if (recognizing || associating) return;   // 识别中禁止再次选图（上传后窗口已清空）
+  fileInput.click();
+});
+fileInput.addEventListener("change", () => {
+  if (recognizing || associating) { fileInput.value = ""; return; }  // 识别中忽略新文件
+  pickedFile = fileInput.files[0];
+  lastFileName = null;
+  lastCoarse = null; lastCropFile = null;
+  updatePreview();
+});
+dropZone.addEventListener("dragover", e => { if (recognizing || associating) return; e.preventDefault(); dropZone.style.borderColor = "var(--primary)"; });
+dropZone.addEventListener("dragleave", () => { if (recognizing || associating) return; dropZone.style.borderColor = ""; });
+dropZone.addEventListener("drop", e => {
+  if (recognizing || associating) return;
+  e.preventDefault();
+  dropZone.style.borderColor = "";
+  if (e.dataTransfer.files.length) { pickedFile = e.dataTransfer.files[0]; lastFileName = null; lastCoarse = null; lastCropFile = null; updatePreview(); }
+});
+
+function updatePreview() {
+  if (!pickedFile) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    dropZone.innerHTML = `<div class="phone-frame"><img src="${reader.result}" alt="预览"><span style="font-size:12px;display:block;margin-top:8px;">${pickedFile.name}</span></div>`;
+  };
+  reader.readAsDataURL(pickedFile);
+  updateStartBtn();
+}
+function updateStartBtn() {
+  const btn = document.getElementById("btn-start");
+  const blocked = recognizing || associating;
+  btn.disabled = blocked || !(pickedFile && typeSel.value);
+  // 识别中：上传区置灰、禁止再次点击选图
+  if (blocked) { dropZone.classList.add("disabled"); dropZone.style.pointerEvents = "none"; }
+  else { dropZone.classList.remove("disabled"); dropZone.style.pointerEvents = ""; }
+}
+typeSel.addEventListener("change", updateStartBtn);
+
+function updateCacheTip() {
+  const tip = document.getElementById("cache-tip");
+  if (lastFileName) {
+    tip.style.display = "block";
+    tip.textContent = "已缓存当前截图，切换部位重复识别不会重复上传。";
+  } else {
+    tip.style.display = "none";
+  }
+}
+
+document.getElementById("btn-start").addEventListener("click", () => {
+  if (!pickedFile || !typeSel.value) return;
+  startCrop(null);   // 第一次：无手动框，grounding 自动出框
+});
+
+// 第一步：裁剪（grounding 或手动 box）→ 展示原图+自动框+裁剪图（后台任务 + 轮询，离开页面不中断）
+async function startCrop(box) {
+  if (recognizing || associating) return;  // 识别/关联进行中禁止再次裁剪
+  // 文件可用性前置检查：缓存原图与内存文件都缺失时禁止提交，避免空表单被后端判"未收到文件"
+  if (!lastFileName && !pickedFile) {
+    toast("原图已失效，请重新上传图片");
+    return;
+  }
+  const btn = document.getElementById("btn-start");
+  const result = document.getElementById("result");
+  recognizing = true;
+  updateStartBtn();  // 同步禁用开始按钮 + 置灰上传区（识别中禁止再传图）
+  btn.textContent = box ? "裁剪中…" : "查询中…";
+  startHistoryAuto();  // 识别期间自动刷新日志
+
+  cropPhase = "cropping";
+  result.innerHTML = `<div class="empty">${box ? "正在按新框裁剪…" : "正在定位部件…"}</div>`;
+  setStage({ done: 1, active: 2, title: "结果 · 定位裁剪中", spinner: true });
+
+  const fd = new FormData();
+  if (lastFileName) {
+    fd.append("use_file", lastFileName);
+  } else {
+    fd.append("file", pickedFile);
+  }
+  fd.append("types", typeSel.value);
+  cropTypes = typeSel.value;  // 提交前同步变量：saveSessionTask("crop") 落盘正确的部位
+  fd.append("step", "crop");
+  fd.append("async", "1");
+  if (box) fd.append("box", box.join(","));
+
+  // 提交后立即清空上传预览窗口，释放内存中图片；后端已通过 use_file 缓存原图，后续复用不受影响
+  const dz = document.getElementById("drop-zone");
+  dropZone.innerHTML = `<div class="placeholder">点击选择或拖拽衣橱截图</div>`;
+  pickedFile = null;
+  updateCacheTip();
+  updateStartBtn();
+  saveCropPending(box);  // fetch 前先落盘：导航中断回来也能自动续跑
+
+  try {
+    let taskId;
+    try {
+      const res = await fetch("/api/recognize", { method: "POST", body: fd });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      taskId = data.task_id;
+    } catch (e) {
+      cropPhase = "idle";
+      if (e instanceof TypeError) {
+        // 网络/导航中断：pending 保留，回来自动续跑
+        result.innerHTML = `<div class="empty" style="color:#c0392b;">请求中断：${e.message || e}（若已离开页面，返回后会自动续跑）</div>`;
+      } else {
+        // 后端业务错误（如原图已失效）：给出可执行的引导，而不是"请求中断"误导
+        const msg = (e.message || e).includes("未收到文件")
+          ? "原图已失效，请重新上传图片" : (e.message || e);
+        result.innerHTML = `<div class="empty" style="color:#c0392b;">请求失败：${msg}</div>`;
+      }
+      return;
+    }
+    clearCropPending();
+    cropTaskId = taskId;
+    saveSessionTask("crop");
+
+    const r = await pollTask(taskId);
+    cropTaskId = null;
+    clearSessionTask();
+
+    if (r.status === "cancelled" || r.status === "error") {
+      cropPhase = "idle";
+      const errMsg = r.error || "已取消";
+      result.innerHTML = `<div class="empty" style="color:#c0392b;">裁剪${r.status === "cancelled" ? "已取消" : "失败"}：${errMsg}</div>`;
+      setStage({ done: 1, active: 2, error: true, title: "结果 · 裁剪失败" });
+      return;
+    }
+    const data = r.result || {};
+    if (data.error) {
+      cropPhase = "idle";
+      result.innerHTML = `<div class="empty" style="color:#c0392b;">裁剪失败：${data.error}</div>`;
+      setStage({ done: 1, active: 2, error: true, title: "结果 · 裁剪失败" });
+      return;
+    }
+    if (data.file) { lastFileName = data.file; cropOrigFile = data.file; updateCacheTip(); }
+    cropBox = data.box; cropFile = data.crop_file; cropTypes = typeSel.value;
+    cropCached = data.cached || false;
+
+    if (box) {
+      // 手动框裁剪完成：等用户点「接着跑粗排」手动开始（可先审视框选）
+      cropPhase = "rerun_ready";
+      renderCropPanel(data, null);
+      setStage({ done: 2, title: "结果 · 已裁剪，确认框选后点「接着跑粗排」" });
+      saveCropReady();  // 保存待确认上下文，离开页面回来可恢复
+    } else {
+      // 自动出框：直接自动跑粗排（运行中可暂停）
+      cropPhase = "locating";
+      renderCropPanel(data, null);
+      await runRecall();
+    }
+  } finally {
+    recognizing = false;
+    stopHistoryAuto();  // 停止自动刷新并强制刷一次
+    updateStartBtn();   // 解除开始按钮禁用 + 取消上传区置灰
+    btn.textContent = "开始查询";
+    loadHistory();  // 识别后刷新历史
+  }
+}
+
+// 轮询后台识别任务直到完成/失败/取消（页面跳转后任务仍在后端跑，回来可续上）
+function pollTask(taskId, interval = 1500) {
+  return new Promise((resolve) => {
+    const tick = async () => {
+      try {
+        const res = await fetch(`/api/recognize/task/${taskId}`);
+        const d = await res.json();
+        if (d.error) return resolve({ status: "error", error: d.error });
+        if (d.status === "done") return resolve({ status: "done", result: d.result });
+        if (d.status === "error") return resolve({ status: "error", error: d.error });
+      } catch (e) { /* 网络抖动，继续轮询 */ }
+      if (_taskCancelFlag) {  // 用户点过暂停：尽快退出轮询
+        _taskCancelFlag = false;
+        return resolve({ status: "cancelled" });
+      }
+      _pollTimer = setTimeout(tick, interval);
+    };
+    tick();
+  });
+}
+
+// 粗排失败公共处理
+function recallFailUI(errMsg) {
+  recognizing = false;  // 粗排结束（失败也是结束）：恢复可裁剪/可查询
+  const result = document.getElementById("result");
+  setStage({ done: 2, active: 3, error: true, title: "结果 · 粗排失败" });
+  const w = result.querySelector("#coarse-wrap");
+  if (w) w.innerHTML = `<div class="empty" style="color:#c0392b;">错误：${errMsg}</div>`;
+  cropPhase = "ready";
+  updateCropButtons();
+}
+
+// 第二步：粗排召回（后台任务 + 轮询，运行中可暂停，离开页面也不中断）
+async function runRecall() {
+  const result = document.getElementById("result");
+  _taskCancelFlag = false;
+  clearCropReady();  // 手动框确认后开始粗排：清除「待确认」落盘
+  cropPhase = "locating";
+  updateCropButtons();
+  setStage({ done: 2, active: 3, title: "结果 · 粗排中", spinner: true });
+  const wrap = result.querySelector("#coarse-wrap");
+  if (wrap) wrap.innerHTML = `<div class="empty">粗排召回中…（可点暂停，离开页面也不中断）</div>`;
+
+  const fd = new FormData();
+  if (cropOrigFile) fd.append("use_file", cropOrigFile);
+  fd.append("crop_file", cropFile);
+  fd.append("types", cropTypes || typeSel.value);  // 兜底：恢复链路未同步部位时回退下拉框
+  fd.append("step", "recall");
+  fd.append("async", "1");
+  if (cropBox) fd.append("box", cropBox.join(","));
+  let taskId;
+  try {
+    const res = await fetch("/api/recognize", { method: "POST", body: fd });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    taskId = data.task_id;
+  } catch (e) {
+    recallFailUI(e.message || "网络错误");
+    return;
+  }
+  cropTaskId = taskId;
+  saveSessionTask("recall");
+  const r = await pollTask(taskId);
+  cropTaskId = null;
+  clearSessionTask();
+  if (r.status === "cancelled") {
+    // 暂停粗排：任务仍在后台跑（结果照写日志，可去历史查看），前端进入调整框选态
+    recognizing = false;  // 粗排暂停结束：可重新框选/重新查询
+    cropPhase = "editing";
+    updateCropButtons();
+    setStage({ done: 2, active: 3, title: "结果 · 粗排已暂停，可调整框选" });
+    return;
+  }
+  if (r.status === "error") {
+    recallFailUI(r.error || "未知错误");
+    return;
+  }
+  const data = r.result;
+  if (!data || data.error) {
+    recallFailUI((data && data.error) || "未知错误");
+    return;
+  }
+  data.file = cropOrigFile; data.crop_file = cropFile;
+  data.box = cropBox;  // cached 保留后端返回值：true=命中同图同部件粗排缓存
+  lastCoarse = data.coarse || [];
+  lastCropFile = cropFile;
+  lastResultData = data;
+  recognizing = false;  // 粗排完成：识别结束，恢复「重新框选」等裁剪能力
+  cropPhase = "ready";
+  renderResult(data, null);
+}
+
+// 暂停粗排：标记本地取消 + 通知后端（后台线程不强制终止，结果仍会写日志）
+function pauseRecall() {
+  _taskCancelFlag = true;
+  if (cropTaskId) {
+    fetch(`/api/recognize/task/${cropTaskId}/cancel`, { method: "POST" }).catch(() => {});
+  }
+}
+
+// 精排：对勾选的候选批量比对（后台任务 + 轮询，复用粗排裁剪图，不重跑粗排）
+async function runPrecise(data, candIds) {
+  if (!candIds.length) return [];
+  _taskCancelFlag = false;
+  const fd = new FormData();
+  fd.append("crop_file", data.crop_file);
+  fd.append("cand_ids", candIds.join(","));
+  fd.append("types", cropTypes || "精排");  // 用裁剪时的部位，避免切换下拉框导致精排日志部位不准
+  fd.append("async", "1");
+  if (data.file) fd.append("file", data.file);
+  try {
+    const res = await fetch("/api/recognize/precise", { method: "POST", body: fd });
+    const d = await res.json();
+    if (d.error) throw new Error(d.error);
+    cropTaskId = d.task_id;
+    saveSessionTask("precise");
+    const r = await pollTask(d.task_id);
+    cropTaskId = null;
+    clearSessionTask();
+    if (r.status === "error") return null;
+    if (r.status === "cancelled") return null;
+    if (!r.result || r.result.error) return null;
+    return r.result.hit_ids || [];
+  } catch (e) {
+    return null;  // 返回 null 表示失败，区别于空命中
+  }
+}
+
+// 耗时格式化：秒 → xx分xx秒
+function fmtDur(s) {
+  s = Math.round(parseFloat(s) || 0);
+  if (s < 60) return `${s}秒`;
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return sec ? `${m}分${sec}秒` : `${m}分`;
+}
+
+// toast 提示
+function toast(msg) {
+  let t = document.getElementById("toast");
+  if (!t) {
+    t = document.createElement("div");
+    t.id = "toast";
+    t.style.cssText = "position:fixed; top:20px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,.8); color:#fff; padding:10px 20px; border-radius:8px; font-size:14px; z-index:200; transition:opacity .3s;";
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.opacity = "1";
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => { t.style.opacity = "0"; }, 2500);
+}
+
+function starsOf(star) { return "★".repeat(parseInt(star) || 5); }
+
+function renderResult(data, hitIds) {
+  const coarse = data.coarse || [];
+  const result = document.getElementById("result");
+  if (coarse.length === 0) {
+    result.innerHTML = cropPanelHTML() + `<div class="empty">未识别到部件</div>`;
+    bindCropButtons();
+    updateCropButtons();
+    setCropPanelCollapsed(true);  // 完成态：收起预览，结果直接可见
+    return;
+  }
+  const isPrecise = hitIds !== null && hitIds !== undefined;
+  // 用字符串比较，避免 item_id 数字/字符串类型不一致
+  const hitSet = isPrecise ? new Set((hitIds || []).map(String)) : null;
+
+  // 精排模式：命中的项置顶，未命中的降低透明度排在后面
+  let ordered = coarse;
+  if (isPrecise) {
+    const hits = coarse.filter(c => hitSet.has(String(c.item_id)));
+    const rest = coarse.filter(c => !hitSet.has(String(c.item_id)));
+    ordered = [...hits, ...rest];
+  }
+
+  // 裁剪预览区（原图+框+裁剪图，按钮状态由 cropPhase 控制）
+  let html = cropPanelHTML();
+
+  // 顶部栏：左侧信息 + 右侧精排按钮（与日志详情一致）
+  html += `<div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; flex-wrap:wrap;">
+    <div style="font-size:12px; color:var(--muted); display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+      <span>耗时 ${fmtDur(data.elapsed)}</span>
+      ${data.cached ? `<span style="color:#2e7d32; font-weight:600;">· 命中粗排缓存</span>` : ''}
+      ${data.crop_file ? `<a href="javascript:void(0)" onclick="showLightbox('/uploads/${data.crop_file}')" style="color:var(--primary);">查看裁剪图</a>` : ''}
+      <span>坐标 [${(data.box||[]).join(',')}]</span>
+    </div>
+  </div>`;
+
+  if (isPrecise) {
+    const hitCount = hitIds.length;
+    html += `<div style="font-size:13px; font-weight:700; margin-bottom:10px; color:#2e7d32;">精排完成：命中 ${hitCount} 个（已高亮）</div>`;
+  }
+
+  html += `<div style="font-size:12px; color:var(--muted); margin-bottom:8px;">勾选确认正确部件，关联照片会自动加入心愿单</div>`;
+  html += `<div class="cand-grid">`;
+
+  ordered.forEach((m) => {
+    const alias = m.alias ? `（${m.alias}）` : "";
+    const hit = isPrecise && hitSet.has(String(m.item_id));
+    const big = m.image_big || m.image;
+    const src = m.image_big || m.image;
+    const img = src ? `<img class="preview" src="${src}" loading="lazy" onerror="this.style.visibility='hidden'" data-big="${big || ''}" title="点击查看大图">` : "";
+    const setBtn = m.set_id ? `<button class="goto-set" data-setid="${m.set_id}">套装</button>` : '';
+    // 散件来源：可点击查看来源详情（obtain），点击弹窗查询最新数据
+    const looseTag = m.set_id
+      ? ''
+      : ` · <span class="loose-tag loose-link" data-itemid="${m.item_id || ''}" title="点击查看散件来源详情">散件${m.obtain ? '-来源：' + shortObtain(m.obtain) : '来源'}</span>`;
+    html += `
+      <div class="cand ${hit ? 'hit' : (isPrecise ? 'dim' : '')}">
+        ${img}
+        <div class="info">
+          <div class="cand-top">
+            <input type="checkbox" class="confirm-cb" data-itemid="${m.item_id || ''}" title="勾选后关联">
+            <div class="name">${m.item_name}<span class="alias">${alias}</span></div>
+          </div>
+          <div class="meta">${m.type || ''} · ${starsOf(m.star)} · 相似 ${m.sim}${m.set_id ? (m.set_name ? ' · ' + m.set_name : '') : looseTag}</div>
+          <div class="cand-actions">${setBtn}</div>
+        </div>
+      </div>`;
+  });
+
+  html += `</div>`;
+  result.innerHTML = html;
+
+  // 统一状态：精排命中→第4步完成；粗排结果→第3步完成
+  setStage({ done: isPrecise ? 4 : 3, title: isPrecise ? "结果 · 精排完成" : "结果 · 粗排完成" });
+
+  bindCropButtons();
+  updateCropButtons();
+  setCropPanelCollapsed(true);  // 完成态：收起预览，结果列表直接可见（可随时展开）
+
+  result.querySelectorAll(".cand img").forEach(im => {
+    im.addEventListener("click", () => {
+      const big = im.dataset.big || im.src;
+      if (big) showLightbox(big);
+    });
+  });
+  result.querySelectorAll(".goto-set").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const sid = parseInt(btn.dataset.setid, 10);
+      if (sid) openSetModal(sid);  // 弹窗内打开套装，不中断识别
+    });
+  });
+  result.querySelectorAll(".loose-link").forEach(el => {
+    el.addEventListener("click", () => openLooseDetail(parseInt(el.dataset.itemid, 10)));
+  });
+
+  const cbs = [...result.querySelectorAll(".confirm-cb")];
+  const preciseBtn = document.getElementById("precise-btn");
+  const confirmBtn = document.getElementById("confirm-btn");
+  if (preciseBtn) preciseBtn.style.display = 'inline-block';  // 底部操作栏：粗排完成显示精排入口
+  if (confirmBtn) confirmBtn.style.display = 'inline-block';
+
+  function updateBtns() {
+    const n = cbs.filter(c => c.checked).length;
+    preciseBtn.disabled = n === 0;
+    preciseBtn.textContent = "▶ 接着跑精排";
+    confirmBtn.disabled = n === 0;
+  }
+  cbs.forEach(cb => cb.addEventListener("change", updateBtns));
+
+  // 精排：对勾选的候选批量比对（dock 固定按钮，onclick 覆盖避免重复绑定）
+  preciseBtn.onclick = async () => {
+    const checked = cbs.filter(c => c.checked).map(c => parseInt(c.dataset.itemid, 10));
+    if (!checked.length) return;
+    recognizing = true;
+    cropPhase = "precise";  // 精排比对中：禁止裁剪/重新查询
+    preciseBtn.disabled = true; preciseBtn.textContent = "精排中…";
+    setStage({ done: 3, active: 4, title: "结果 · 精排比对中…", spinner: true });
+    updateCropButtons();  // 隐藏裁剪按钮、禁用「开始查询」，防止精排中裁图
+    startHistoryAuto();  // 精排期间自动刷新日志
+
+    const hitIds = await runPrecise(data, checked);
+    recognizing = false;
+    stopHistoryAuto();  // 停止自动刷新并强制刷一次
+    cropPhase = "ready";
+    if (hitIds === null) {
+      toast("精排失败，请重试");
+      setStage({ done: 3, active: 4, error: true, title: "结果 · 精排失败" });
+      updateCropButtons();  // 恢复「重新框选」等 ready 态按钮
+      preciseBtn.style.display = 'inline-block';  // updateCropButtons 会隐藏 dock 按钮，这里恢复精排入口
+      updateBtns();
+      loadHistory();
+      return;
+    }
+    if (hitIds.length === 0) {
+      toast("未匹配到相同部件");
+      setStage({ done: 3, active: 4, error: true, title: "结果 · 未匹配到相同部件" });
+      updateCropButtons();
+      preciseBtn.style.display = 'inline-block';
+      updateBtns();
+      loadHistory();
+      return;
+    }
+    // 命中项高亮（置顶 + 绿色），标题/步骤由 renderResult 统一设置
+    updateCropButtons();  // 恢复 ready 态裁剪按钮
+    renderResult(data, hitIds);  // renderResult 内部会重新显示精排/关联入口
+    toast(`精排命中 ${hitIds.length} 个`);
+    loadHistory();
+  };
+
+  // 关联截图（自动加心标）
+  confirmBtn.onclick = async () => {
+    const checked = cbs.filter(c => c.checked).map(c => parseInt(c.dataset.itemid, 10));
+    if (!checked.length) return;
+    associating = true;
+    confirmBtn.disabled = true; confirmBtn.textContent = "关联中…";
+    updateCropButtons();  // 隐藏裁剪按钮、禁用「开始查询」/精排，防止关联中裁图
+    try {
+      for (const itemId of checked) {
+        await fetch("/api/photo/link", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ item_id: itemId, file: data.file })
+        });
+        // 自动加入心愿单（ensure 幂等，已在心愿单则不重复加）
+        await fetch("/api/wishlist/toggle", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ item_id: itemId, ensure: true })
+        });
+      }
+      confirmBtn.textContent = `已关联 ${checked.length} 个并加心标`;
+      addWishlistEntry(confirmBtn);
+    } finally {
+      associating = false;
+      updateCropButtons();  // 恢复 ready 态裁剪按钮
+      updateStartBtn();     // 解除上传区置灰
+      ["precise-btn", "confirm-btn"].forEach(id => {  // updateCropButtons 会隐藏它们，这里恢复
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'inline-block';
+      });
+      updateBtns();  // 恢复精排/关联按钮的可用状态
+    }
+  };
+}
+
+// 在"已关联 X 个并加心标"按钮旁追加"进入心愿单"入口（防重复追加）
+function addWishlistEntry(afterBtn) {
+  const host = afterBtn.parentElement;
+  if (host.querySelector(".go-wishlist")) return;
+  const a = document.createElement("a");
+  a.className = "go-wishlist";
+  a.href = "/wishlist?from=recognize";
+  a.target = "";
+  a.textContent = "进入心愿单 →";
+  a.style.cssText = "display:inline-flex; align-items:center; padding:4px 12px; font-size:12px; font-weight:600; background:var(--primary); color:#fff; border-radius:6px; text-decoration:none;";
+  host.appendChild(a);
+}
+
+/* ---------- 历史（右侧常驻） ---------- */
+// 识别进行中自动轮询刷新日志，无需手动刷新
+let _historyTimer = null;
+function startHistoryAuto() {
+  if (_historyTimer) return;
+  _historyTimer = setInterval(() => { if (recognizing) loadHistory(); }, 3000);
+  loadHistory();  // 立即先刷一次
+}
+function stopHistoryAuto() {
+  if (_historyTimer) { clearInterval(_historyTimer); _historyTimer = null; }
+}
+// 历史日志分页：全量数据 + 每页最多 30 条，切页无网络请求；搜索在全量上过滤后分页
+let histLogs = [];
+let histPage = 1;
+let _histTotal = null;   // 上次接口返回的总条数（变更检测用）
+let _histHeadKey = null; // 上次最新一条日志标识（变更检测用）
+const HIST_PAGE_SIZE = 30;
+
+async function loadHistory(force = false) {
+  const box = document.getElementById("history");
+  let data;
+  try {
+    const res = await fetch("/api/recognize/log?n=500");
+    data = await res.json();
+  } catch (e) {
+    box.innerHTML = `<div class="empty" style="color:#c0392b;">加载失败</div>`;
+    return;
+  }
+  const logs = data.logs || [];
+  // 变更检测：总条数与最新日志标识都没变 → 数据无新增，直接跳过渲染。
+  // 识别期间每 3 秒轮询一次，多数时候没有新日志，避免反复全量重建 DOM 导致卡顿
+  const headKey = logs.length ? (logs[0].id ?? logs[0].time ?? '') : '';
+  if (!force && _histTotal === data.total && _histHeadKey === headKey) return;
+  const prevLogs = histLogs;
+  _histTotal = data.total;
+  _histHeadKey = headKey;
+  histLogs = logs;
+  document.getElementById("hist-count").textContent =
+    data.total ? `${data.total} 条` : (histLogs.length ? `${histLogs.length} 条` : "");
+  if (!histLogs.length) {
+    box.innerHTML = `<div class="empty">暂无记录</div>`;
+    document.getElementById("hist-pager").style.display = "none";
+    return;
+  }
+  renderHist(prevLogs);
+}
+
+// 搜索过滤：全量数据上按 时间/部位/top1/命中名 匹配（与原来 DOM 全文过滤行为一致）
+function histFilteredList() {
+  const q = (histSearch.value || "").trim().toLowerCase();
+  if (!q) return histLogs;
+  return histLogs.filter(l =>
+    [l.time, l.types, l.top1, (l.top || []).map(t => t && `${t.name || ''} ${t.alias || ''}`).join(' ')]
+      .join(' ').toLowerCase().includes(q)
+  );
+}
+
+function renderHist(prevLogs) {
+  const box = document.getElementById("history");
+  const pager = document.getElementById("hist-pager");
+  const list = histFilteredList();
+  const total = list.length;
+  const pages = Math.max(1, Math.ceil(total / HIST_PAGE_SIZE));
+  if (histPage > pages) histPage = pages;
+  if (histPage < 1) histPage = 1;
+  const start = (histPage - 1) * HIST_PAGE_SIZE;
+  const pageItems = list.slice(start, start + HIST_PAGE_SIZE);
+  // 增量更新：识别轮询新增少量日志（出现在列表头部）时，只 prepend 新卡片，
+  // 已有卡片与图片不重建不重载，避免反复全量渲染导致卡顿
+  const added = (prevLogs && histPage === 1 && !(histSearch.value || "").trim())
+    ? addedCount(list, prevLogs) : 0;
+  if (added > 0 && added <= 10) {
+    box.insertAdjacentHTML("afterbegin", pageItems.slice(0, added).map(logCardHTML).join(""));
+  } else {
+    box.innerHTML = pageItems.map(logCardHTML).join("");
+  }
+  bindHistEvents(box, pageItems);
+
+  if (pages <= 1) { pager.style.display = "none"; return; }
+  const mk = (label, pg, cls, disabled) =>
+    `<button class="${cls || ''}" ${disabled ? 'disabled' : ''} onclick="histGoPage(${pg})">${label}</button>`;
+  const btns = [];
+  btns.push(mk("‹ 上一页", histPage - 1, "", histPage <= 1));
+  let lo = Math.max(1, histPage - 3), hi = Math.min(pages, histPage + 3);
+  if (hi - lo + 1 < 7) { if (lo === 1) hi = Math.min(pages, lo + 6); else if (hi === pages) lo = Math.max(1, hi - 6); }
+  if (lo > 1) btns.push(mk("1", 1, "", false), mk("…", 1, "", true));
+  for (let p = lo; p <= hi; p++) btns.push(mk(String(p), p, p === histPage ? "active" : "", false));
+  if (hi < pages) btns.push(mk("…", pages, "", true), mk(String(pages), pages, "", false));
+  btns.push(mk("下一页 ›", histPage + 1, "", histPage >= pages));
+  pager.innerHTML = `<span class="pg-info">共 ${total} 条 · 第 ${histPage}/${pages} 页</span>` + btns.join("");
+  pager.style.display = "flex";
+}
+
+// 计算新增条数：新列表头部与旧列表第一条首次相遇的偏移；无法精确匹配时返回 0（走全量渲染）
+function addedCount(list, prev) {
+  if (!list.length || !prev.length) return 0;
+  const key = l => (l && l.id != null) ? `id:${l.id}` : '';
+  const prevHead = key(prev[0]);
+  if (!prevHead) return 0;
+  const idx = list.findIndex(l => key(l) === prevHead);
+  return idx > 0 ? idx : 0;
+}
+
+function histGoPage(n) {
+  const pages = Math.max(1, Math.ceil(histFilteredList().length / HIST_PAGE_SIZE));
+  if (n < 1 || n > pages || n === histPage) return;
+  histPage = n;
+  renderHist();
+  const box = document.getElementById("history");
+  if (box) box.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function logCardHTML(l) {
+  // kind 字段区分粗排/精排；兼容旧日志（无 kind 时用 types/precise_hits 推断）
+  const isPreciseLog = l.kind === "precise" || l.types === "精排" || Array.isArray(l.precise_hits);
+  const kindBadge = `<span class="log-kind ${isPreciseLog ? 'precise' : 'coarse'}">${isPreciseLog ? '精排' : '粗排'}</span>`;
+  // ID 徽章：点击复制，便于反馈/定位问题时直接给出日志编号
+  const idBadge = l.id
+    ? `<span class="log-id" title="点击复制日志 ID，便于定位问题" onclick="copyLogId(${l.id}, event)">#${l.id}</span>`
+    : '';
+  // top1 高亮行：名称 + 金色相似度 + 散件标签
+  const top1Name = l.top1 || (l.top && l.top[0] && l.top[0].name) || '无';
+  const top1Sim = (l.top && l.top[0] && l.top[0].sim != null) ? String(l.top[0].sim) : '';
+  const top0 = l.top && l.top[0];
+  const looseTag = (top0 && !top0.set_id)
+    ? `<span class="loose-tag loose-link" data-itemid="${top0.item_id || ''}" title="点击查看散件来源详情">散件${top0.obtain ? '-来源：' + shortObtain(top0.obtain) : '来源'}</span>`
+    : '';
+  // 精排模式下：precise_hits 非空才是真命中；为空时 top1 只是粗排候选，标签显示"未命中"避免误读
+  const preciseHit = isPreciseLog && Array.isArray(l.precise_hits) && l.precise_hits.length > 0;
+  const top1Label = isPreciseLog ? (preciseHit ? '命中' : '未命中') : 'Top1';
+  // 精排模式下"未命中"：不显示部件名，仅展示状态标签
+  const top1Line = isPreciseLog && !preciseHit
+    ? `<div class="log-top1"><span class="label">未命中</span></div>`
+    : `<div class="log-top1"><span class="label">${top1Label}</span><span class="name">${top1Name}</span>${looseTag}<span class="sim">${top1Sim}</span></div>`;
+  // top 列表：最多 3 条，防卡片过高；完整列表见"查看详情"
+  const topList = (l.top || []).slice(0, 3).map((t, i) => {
+    const alias = (t.alias && String(t.alias).trim()) ? `（${t.alias}）` : "";
+    return `<div class="log-top-row"><span style="color:var(--muted);">${i+1}.</span><span class="name">${t.name || ''}</span><span class="alias">${alias}</span><span class="sim">${t.sim ?? ''}</span></div>`;
+  }).join("");
+  const topMore = (l.top || []).length > 3 ? `<div class="log-more">还有 ${(l.top || []).length - 3} 条候选，见详情…</div>` : '';
+  const thumbs = [];
+  if (l.file) thumbs.push(`<img loading="lazy" src="/uploads/${l.file}" data-big="/uploads/${l.file}" title="上传原图">`);
+  if (l.crop_file) thumbs.push(`<img loading="lazy" src="/uploads/${l.crop_file}" data-big="/uploads/${l.crop_file}" title="裁剪图">`);
+  // 底部 meta：坐标 / 耗时 / 精排命中 合并为一行灰字
+  const metaBits = [];
+  if (l.box && l.box.length) metaBits.push(`坐标[${l.box.join(',')}]`);
+  metaBits.push(`耗时 ${fmtDur(l.elapsed)}`);
+  if (isPreciseLog && Array.isArray(l.precise_hits) && l.precise_hits.length) {
+    metaBits.push(`<span class="hit-line">精排命中 ${l.precise_hits.join('、')}</span>`);
+  }
+  return `<div class="log-item">
+    <div class="log-head">
+      <span class="log-time">${l.time}</span>${kindBadge}${idBadge}
+    </div>
+    ${top1Line}
+    ${thumbs.length ? `<div class="log-thumb">${thumbs.join("")}</div>` : ''}
+    ${topList ? `<div class="log-top-list">${topList}${topMore}</div>` : ''}
+    <div class="log-meta">
+      ${metaBits.join('<span>·</span>')}
+      <button class="hist-btn" data-id="${l.id ?? ''}" data-time="${l.time ?? ''}">查看详情</button>
+    </div>
+  </div>`;
+}
+
+// 事件委托：一次性绑定在 #history 容器上，增量插入的新卡片自动生效（不重复绑定、无索引错位）
+let _histDelegateBound = false;
+function bindHistEvents(box, pageItems) {
+  if (_histDelegateBound || !box) return;
+  _histDelegateBound = true;
+  box.addEventListener("click", (ev) => {
+    const img = ev.target.closest(".log-thumb img");
+    if (img) { showLightbox(img.dataset.big || img.src); return; }
+    const loose = ev.target.closest(".loose-link");
+    if (loose) { openLooseDetail(parseInt(loose.dataset.itemid, 10)); return; }
+    const btn = ev.target.closest("button.hist-btn");
+    if (!btn) return;
+    // 优先按 id 定位（新版日志）；旧日志无 id 退化为按 time 定位
+    let l = btn.dataset.id
+      ? histLogs.find(x => String(x.id) === String(btn.dataset.id)) : null;
+    if (!l && btn.dataset.time) {
+      l = histLogs.find(x => String(x.time) === String(btn.dataset.time)) || null;
+    }
+    if (!l) return;
+    if (l.id) {
+      openLogDetail(l.id);
+    } else {
+      openModal("日志详情", `<div class="empty">加载中…</div>`);
+      cmodalTitle.textContent = `日志详情 · ${l.types}`;
+      renderHistoryResult(l, cmodalBody);
+    }
+  });
+}
+
+async function copyLogId(id, ev) {
+  ev.stopPropagation();
+  const idText = String(id);
+  try {
+    await navigator.clipboard.writeText(idText);
+  } catch (e) {
+    const ta = document.createElement("textarea");
+    ta.value = idText; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); } catch (e2) {}
+    document.body.removeChild(ta);
+  }
+  const el = ev.currentTarget;
+  const old = el.textContent;
+  el.textContent = "已复制";
+  setTimeout(() => { el.textContent = old; }, 1200);
+}
+
+// 历史回显：把日志结果渲染到中栏（含心标 + 关联截图操作）
+// ================= 裁剪预览区 + 框选编辑 =================
+let dragState = null;  // {mode, startX, startY, orig}
+let drawState = null;  // 重画模式起点
+
+// 裁剪预览区 HTML（按钮显示状态由 cropPhase 决定）
+function cropPanelHTML() {
+  const b = cropBox || [];
+  const coord = b.length === 4 ? `坐标 [${b.join(',')}]` : '坐标 [-]';
+  const cropSrc = cropFile ? `/uploads/${cropFile}` : '';
+  const origSrc = cropOrigFile ? `/uploads/${cropOrigFile}` : '';
+  return `
+  <div class="crop-panel" id="crop-panel">
+    <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px; flex-wrap:nowrap;">
+      <span style="font-size:13px; font-weight:700; white-space:nowrap; flex-shrink:0;">裁剪预览${cropCached ? ' <span style="color:#2e7d32;font-weight:600;">· 命中灰度缓存</span>' : ''}</span>
+      <button class="crop-toggle" id="crop-toggle" type="button">▾ 收起预览</button>
+    </div>
+    <div class="crop-main">
+      <div class="crop-stage-wrap" id="crop-stage">
+        ${origSrc ? `<img id="crop-orig" src="${origSrc}" alt="原图">` : ''}
+        <div class="crop-zoom" id="crop-zoom">
+          <button id="zoom-out" type="button" title="缩小">−</button>
+          <span id="zoom-val">100%</span>
+          <button id="zoom-in" type="button" title="放大">+</button>
+          <button id="zoom-reset" type="button" title="重置缩放">⤾</button>
+        </div>
+        <div class="crop-box" id="crop-box" style="display:none;">
+          <span class="crop-handle tl" data-dir="tl"></span>
+          <span class="crop-handle tr" data-dir="tr"></span>
+          <span class="crop-handle bl" data-dir="bl"></span>
+          <span class="crop-handle br" data-dir="br"></span>
+        </div>
+      </div>
+      ${cropSrc ? `<div class="crop-thumb"><img src="${cropSrc}" onclick="showLightbox('/uploads/${cropFile}')" title="点击放大裁剪图"><span>裁剪图</span></div>` : ''}
+    </div>
+    <div class="crop-bar">
+      <span class="crop-coord" id="crop-coord">${coord}</span>
+    </div>
+    <div class="crop-tip" id="crop-tip"></div>
+  </div>`;
+}
+
+// 折叠/展开裁剪预览（完成态自动收起，把空间让给结果）
+function setCropPanelCollapsed(collapsed) {
+  const p = document.getElementById("crop-panel");
+  const t = document.getElementById("crop-toggle");
+  if (!p) return;
+  p.classList.toggle("collapsed", !!collapsed);
+  if (t) t.textContent = collapsed ? "▸ 展开预览" : "▾ 收起预览";
+}
+
+// 裁剪预览区 + 粗排区占位（用于定位/暂停/待重跑阶段）
+function renderCropPanel(data, coarse) {
+  const result = document.getElementById("result");
+  const inner = coarse && coarse.length
+    ? '' : '<div class="empty">（未跑粗排，裁剪不准可暂停/重新框选）</div>';
+  result.innerHTML = cropPanelHTML() + `<div id="coarse-wrap">${inner}</div>`;
+  bindCropButtons();
+  updateCropButtons();
+  // 定位/暂停/待重跑：桌面端保持展开看框；手机端默认折叠，避免原图撑爆整屏，点「展开预览」再手动看
+  const isMobile = window.matchMedia("(max-width: 768px)").matches;
+  setCropPanelCollapsed(isMobile ? true : false);
+}
+
+// 按钮显示状态机
+function updateCropButtons() {
+  const show = id => { const el = document.getElementById(id); if (el) el.style.display = 'inline-block'; };
+  const hide = id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; };
+  const tip = document.getElementById("crop-tip");
+  const stage = document.getElementById("crop-stage");
+  const boxEl = document.getElementById("crop-box");
+  // busy（精排比对/裁剪请求/关联中）：裁剪类按钮一律隐藏，「开始查询」禁用，防止流程互相打架
+  // 注意：粗排中(locating)可暂停、粗排完成(ready)后可重新框选，均不在此列
+  const busy = associating || cropPhase === "cropping" || cropPhase === "precise";
+  if (busy) {
+    ["crop-pause", "crop-redraw", "crop-confirm", "crop-cancel", "crop-rerun", "crop-reedit"].forEach(hide);
+    const startBtn = document.getElementById("btn-start");
+    if (startBtn) startBtn.disabled = true;
+    if (tip) tip.textContent = associating ? "关联中，暂不能裁剪…" : "识别比对中，暂不能裁剪…";
+    if (associating) {  // 关联中同时禁用精排入口，避免与关联循环并发
+      const pb = document.getElementById("precise-btn");
+      if (pb) pb.disabled = true;
+    }
+    return;
+  }
+  ["crop-pause", "crop-redraw", "crop-confirm", "crop-cancel", "crop-rerun", "crop-reedit", "precise-btn", "confirm-btn"].forEach(hide);
+  if (stage) stage.classList.remove("drawing");
+  if (boxEl) boxEl.classList.remove("editing");
+  if (tip) tip.textContent = "";
+  switch (cropPhase) {
+    case "locating":
+      show("crop-pause");
+      if (tip) tip.textContent = "粗排召回中… 裁剪不准可点「暂停粗排」重新框选";
+      break;
+    case "editing":
+      show("crop-redraw"); show("crop-confirm"); show("crop-cancel");
+      if (tip) tip.textContent = "拖动框体移动，拖四角缩放，或点「重画」重新拖一个框";
+      if (stage) stage.classList.add("drawing");
+      if (boxEl) boxEl.classList.add("editing");
+      break;
+    case "rerun_ready":
+      show("crop-rerun"); show("crop-reedit");
+      if (tip) tip.textContent = "新裁剪图已生成，点「接着跑粗排」用新框召回（跳过定位，只跑比对）";
+      break;
+    case "ready":
+      show("crop-reedit");
+      if (tip) tip.textContent = "裁剪不准可点「重新框选」调整后重跑粗排";
+      break;
+  }
+}
+
+// 归一化框(0-1000) ↔ 原图显示像素
+function normToPx(stage, box) {
+  const img = stage.querySelector("img");
+  const w = (img && img.clientWidth) || 1, h = (img && img.clientHeight) || 1;
+  return { x: box[0] / 1000 * w, y: box[1] / 1000 * h,
+           w: (box[2] - box[0]) / 1000 * w, h: (box[3] - box[1]) / 1000 * h };
+}
+function pxToNorm(stage, r) {
+  const img = stage.querySelector("img");
+  const w = (img && img.clientWidth) || 1, h = (img && img.clientHeight) || 1;
+  return [Math.round(r.x / w * 1000), Math.round(r.y / h * 1000),
+          Math.round((r.x + r.w) / w * 1000), Math.round((r.y + r.h) / h * 1000)];
+}
+function getBoxRect(boxEl) {
+  return { x: parseFloat(boxEl.style.left) || 0, y: parseFloat(boxEl.style.top) || 0,
+           w: parseFloat(boxEl.style.width) || 0, h: parseFloat(boxEl.style.height) || 0 };
+}
+function applyBoxPx(stage, boxEl, r) {
+  r.w = Math.max(4, r.w); r.h = Math.max(4, r.h);
+  boxEl.style.left = r.x + "px"; boxEl.style.top = r.y + "px";
+  boxEl.style.width = r.w + "px"; boxEl.style.height = r.h + "px";
+  boxEl.style.display = "block";
+  const coord = document.getElementById("crop-coord");
+  if (coord) coord.textContent = "坐标 [" + pxToNorm(stage, r).join(",") + "]";
+}
+
+// 拖动/缩放手柄
+function startDrag(stage, boxEl, e, mode) {
+  e.preventDefault();
+  dragState = { mode, startX: e.clientX, startY: e.clientY, orig: getBoxRect(boxEl) };
+  document.addEventListener("mousemove", onDragMove);
+  document.addEventListener("mouseup", onDragEnd);
+}
+function onDragMove(e) {
+  if (!dragState) return;
+  const dx = e.clientX - dragState.startX, dy = e.clientY - dragState.startY;
+  const o = dragState.orig;
+  const stage = document.getElementById("crop-stage");
+  const img = stage.querySelector("img");
+  const W = (img && img.clientWidth) || 1, H = (img && img.clientHeight) || 1;
+  let r;
+  if (dragState.mode === "move") {
+    r = { x: o.x + dx, y: o.y + dy, w: o.w, h: o.h };
+  } else {
+    const dir = dragState.mode.replace("resize-", "");
+    let { x, y, w, h } = o;
+    if (dir.includes("l")) { x = Math.min(o.x + dx, o.x + o.w - 4); w = o.x + o.w - x; }
+    if (dir.includes("r")) { w = Math.max(4, o.w + dx); }
+    if (dir.includes("t")) { y = Math.min(o.y + dy, o.y + o.h - 4); h = o.y + o.h - y; }
+    if (dir.includes("b")) { h = Math.max(4, o.h + dy); }
+    r = { x, y, w, h };
+  }
+  r.x = Math.max(0, Math.min(r.x, W - 4));
+  r.y = Math.max(0, Math.min(r.y, H - 4));
+  r.w = Math.max(4, Math.min(r.w, W - r.x));
+  r.h = Math.max(4, Math.min(r.h, H - r.y));
+  applyBoxPx(stage, document.getElementById("crop-box"), r);
+}
+function onDragEnd() {
+  dragState = null;
+  document.removeEventListener("mousemove", onDragMove);
+  document.removeEventListener("mouseup", onDragEnd);
+}
+
+// 重画：在原图上拖新框
+function startDrawMode(stage, boxEl) {
+  stage.classList.add("drawing");
+  boxEl.style.display = "none";
+  const tip = document.getElementById("crop-tip");
+  if (tip) tip.textContent = "在原图上按住拖动画一个新框";
+}
+function startDrawDrag(stage, boxEl, e) {
+  if (e.button !== 0 || e.target === boxEl || boxEl.contains(e.target)) return;
+  e.preventDefault();
+  const img = stage.querySelector("img");
+  const rect = img.getBoundingClientRect();
+  const startX = e.clientX - rect.left, startY = e.clientY - rect.top;
+  drawState = { startX, startY };
+  const onMove = (ev) => {
+    const x = Math.max(0, Math.min(ev.clientX - rect.left, img.clientWidth));
+    const y = Math.max(0, Math.min(ev.clientY - rect.top, img.clientHeight));
+    applyBoxPx(stage, boxEl, { x: Math.min(startX, x), y: Math.min(startY, y),
+                               w: Math.abs(x - startX), h: Math.abs(y - startY) });
+  };
+  const onUp = () => {
+    drawState = null;
+    stage.classList.remove("drawing");
+    document.removeEventListener("mousemove", onMove);
+    document.removeEventListener("mouseup", onUp);
+  };
+  document.addEventListener("mousemove", onMove);
+  document.addEventListener("mouseup", onUp);
+}
+
+// 确认框选 → 带 box 重裁（跳过 grounding）
+function confirmCrop(stage, boxEl) {
+  const r = getBoxRect(boxEl);
+  if (r.w < 4 || r.h < 4) { toast("框选太小，请重画"); return; }
+  cropBox = pxToNorm(stage, r);
+  startCrop(cropBox);
+}
+// 取消编辑
+function cancelEdit(stage, boxEl) {
+  if (lastResultData && lastResultData.crop_file === cropFile) {
+    cropPhase = "ready";
+    renderResult(lastResultData, null);
+  } else {
+    // 裁剪图已更新但尚未跑粗排：回到等待手动开始（点「接着跑粗排」）
+    cropPhase = "rerun_ready";
+    renderCropPanel(null, null);
+    saveCropReady();
+  }
+}
+
+// 绑定裁剪预览区按钮 + 框选交互
+function bindCropButtons() {
+  const stage = document.getElementById("crop-stage");
+  const boxEl = document.getElementById("crop-box");
+  if (!stage || !boxEl) return;
+
+  const bind = (id, fn) => { const el = document.getElementById(id); if (el) el.onclick = fn; };
+
+  // 裁剪预览缩放：改图片显示高度（宽度等比），坐标换算依赖 img.clientWidth/Height 自动跟随
+  const zoomImg = () => {
+    const img = stage.querySelector("img");
+    if (!img) return;
+    img.style.height = Math.round(300 * cropZoom) + "px";
+    img.style.width = "auto";
+    const v = document.getElementById("zoom-val");
+    if (v) v.textContent = Math.round(cropZoom * 100) + "%";
+    // 缩放后按新显示尺寸重算框位置（归一化坐标不变）
+    if (cropBox && cropBox.length === 4) applyBoxPx(stage, boxEl, normToPx(stage, cropBox));
+  };
+  const zoomBy = (d) => {
+    cropZoom = Math.min(3, Math.max(0.6, Math.round((cropZoom + d) * 100) / 100));
+    zoomImg();
+  };
+  bind("zoom-in", () => zoomBy(0.2));
+  bind("zoom-out", () => zoomBy(-0.2));
+  bind("zoom-reset", () => { cropZoom = 1; zoomImg(); });
+  stage.addEventListener("wheel", (e) => {
+    if (!(e.ctrlKey || e.metaKey)) return;  // 普通滚轮留给舞台滚动
+    e.preventDefault();
+    zoomBy(e.deltaY < 0 ? 0.1 : -0.1);
+  }, { passive: false });
+  zoomImg();  // 应用上次/初始缩放
+
+  bind("crop-toggle", () => {
+    const p = document.getElementById("crop-panel");
+    setCropPanelCollapsed(!(p && p.classList.contains("collapsed")));
+  });
+  bind("crop-pause", () => pauseRecall());
+  bind("crop-redraw", () => startDrawMode(stage, boxEl));
+  bind("crop-confirm", () => confirmCrop(stage, boxEl));
+  bind("crop-cancel", () => cancelEdit(stage, boxEl));
+  bind("crop-rerun", () => runRecall());
+  bind("crop-reedit", () => {
+    cropPhase = "editing";
+    setCropPanelCollapsed(false);  // 重新框选：展开预览
+    updateCropButtons();
+    applyBoxPx(stage, boxEl, normToPx(stage, cropBox));
+  });
+
+  // 框体拖动（移动）
+  boxEl.onmousedown = (e) => {
+    if (cropPhase !== "editing" || e.target.classList.contains("crop-handle")) return;
+    startDrag(stage, boxEl, e, "move");
+  };
+  // 四角缩放
+  boxEl.querySelectorAll(".crop-handle").forEach(h => {
+    h.onmousedown = (e) => {
+      if (cropPhase !== "editing") return;
+      e.stopPropagation();
+      startDrag(stage, boxEl, e, "resize-" + h.dataset.dir);
+    };
+  });
+  // 重画模式：在 stage 上拖新框
+  stage.onmousedown = (e) => {
+    if (cropPhase !== "editing" || !stage.classList.contains("drawing")) return;
+    startDrawDrag(stage, boxEl, e);
+  };
+
+  // 初始把归一化框映射为像素框
+  if (cropBox && cropBox.length === 4) applyBoxPx(stage, boxEl, normToPx(stage, cropBox));
+}
+
+async function renderHistoryResult(log, target) {
+  // target 为弹窗容器时：渲染进弹窗，不触碰主工作台（隐藏 dock / 切 tab / 改步骤条都不做）
+  const inModal = !!target;
+  const result = target || document.getElementById("result");
+  if (!inModal) {
+    // 历史详情回显：隐藏 dock 的识别操作按钮（历史详情只保留 back-btn 返回）
+    DOCK_BTN_IDS.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = "none";
+    });
+  }
+  // 非独立详情页且非弹窗：若当前在历史 tab，切回识别工作台以显示回显结果
+  if (!standaloneLog && !inModal && document.getElementById("pane-history").classList.contains("active")) {
+    switchTab("recognize");
+  }
+  const isPreciseLog = log.kind === "precise" || log.types === "精排" || Array.isArray(log.precise_hits);
+  const top = log.top || [];
+  if (!inModal) setStage({ done: isPreciseLog ? 4 : 3, title: `结果 · 详情 ${log.types}` });
+  if (!top.length) {
+    result.innerHTML = `<div class="empty">该条记录无候选列表</div>`;
+    return;
+  }
+  const hitNames = (isPreciseLog && log.precise_hits) ? log.precise_hits : [];
+  const hitSet = new Set(hitNames);
+
+  // 查询当前心愿单状态（用于显示心标）
+  let wishedSet = new Set();
+  try {
+    const w = await fetch("/api/wishlist");
+    const wd = await w.json();
+    wishedSet = new Set((wd.items || []).map(x => String(x.item_id)));
+  } catch (e) {}
+
+  let html = `<div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; flex-wrap:wrap;">
+    <div style="font-size:12px; color:var(--muted);">
+      ${log.time} · ${log.types} · ${isPreciseLog ? '精排' : '粗排'} · 耗时 ${fmtDur(log.elapsed)}
+      ${log.file ? `· <a href="javascript:void(0)" onclick="showLightbox('/uploads/${log.file}')" style="color:var(--primary);">查看原图</a>` : ''}
+      ${log.crop_file ? `· <a href="javascript:void(0)" onclick="showLightbox('/uploads/${log.crop_file}')" style="color:var(--primary);">查看裁剪图</a>` : ''}
+    </div>
+    <div style="display:flex; gap:8px; align-items:center;">
+      ${!inModal ? `<button id="back-btn" style="width:auto; padding:4px 12px; font-size:12px;">← 返回</button>` : ''}
+    </div>
+  </div>`;
+
+  html += `<div class="cand-grid">`;
+  top.forEach((m) => {
+    const alias = m.alias ? `（${m.alias}）` : "";
+    const hit = isPreciseLog && hitSet.has(m.name);
+    const big = m.image_big || m.image || "";
+    // 始终渲染占位 img（带 data-itemid），有图用图、无图靠下方按 item_id 查库补图
+    const img = `<img class="preview" src="${big}" loading="lazy" onerror="this.style.visibility='hidden'" data-big="${big}" data-itemid="${m.item_id || ''}" title="点击查看大图">`;
+    const wished = wishedSet.has(String(m.item_id));
+    const heartBtn = m.item_id
+      ? `<button class="heart-btn ${wished ? 'on' : ''}" data-itemid="${m.item_id}" title="加入/移出心愿单">${wished ? '♥' : '♡'}</button>`
+      : '';
+    const setBtn = m.set_id
+      ? `<button class="goto-set" data-setid="${m.set_id}">套装</button>`
+      : '';
+    // 散件来源：可点击查看来源详情（obtain），点击弹窗查询最新数据
+    const looseTag = m.set_id
+      ? ''
+      : ` · <span class="loose-tag loose-link" data-itemid="${m.item_id || ''}" title="点击查看散件来源详情">散件${m.obtain ? '-来源：' + shortObtain(m.obtain) : '来源'}</span>`;
+    // 精排命中项默认勾选，保留精排选中状态
+    const checked = hit ? "checked" : "";
+    html += `
+      <div class="cand ${hit ? 'hit' : ''}">
+        ${img}
+        <div class="info">
+          <div class="cand-top">
+            <input type="checkbox" class="confirm-cb" data-itemid="${m.item_id || ''}" ${checked} title="勾选后关联截图">
+            <div class="name">${m.name || ''}<span class="alias">${alias}</span></div>
+            ${heartBtn}
+          </div>
+          <div class="meta">${m.type || ''} · ${'★'.repeat(parseInt(m.star)||5)} · 相似 ${m.sim ?? ''}${m.set_id ? (m.set_name ? ' · ' + m.set_name : '') : looseTag}</div>
+          <div class="cand-actions">${setBtn}</div>
+        </div>
+      </div>`;
+  });
+  html += `</div>`;
+
+  html += `<div style="display:flex; justify-content:flex-end; gap:8px; margin-top:12px;">
+    <button class="primary" id="echo-link-btn" style="width:auto;">关联截图到勾选项（自动加心标）</button>
+  </div>`;
+  result.innerHTML = html;
+
+  // 新日志不存长路径：对无图的卡片按 item_id 查库补大图（旧日志有 image_big 则跳过）
+  for (const imgEl of result.querySelectorAll("img.preview")) {
+    if (imgEl.dataset.big) continue;  // 旧日志已有图
+    const card = imgEl.closest(".cand");
+    const cb = card && card.querySelector(".confirm-cb");
+    const itemId = cb && cb.dataset.itemid;
+    if (!itemId) continue;
+    try {
+      const r = await fetch(`/api/part/image?item_id=${itemId}`);
+      const d = await r.json();
+      const src = d.image_big || d.image;
+      if (src) {
+        imgEl.src = src;
+        imgEl.dataset.big = src;
+        imgEl.style.visibility = "visible";
+      }
+    } catch (e) {}
+  }
+
+  // "返回"按钮：独立日志详情页直接回上一页（弹窗内不渲染该按钮，仅靠右上角 × 关闭）
+  const backBtn = result.querySelector("#back-btn");
+  if (backBtn) backBtn.addEventListener("click", () => {
+    if (standaloneLog) { history.back(); return; }
+    if (inModal) { closeModal(); return; }
+    if (recognizing) {
+      // 识别进行中：始终显示"识别中"占位，不要回显旧的 top10（避免残留上次结果）
+      document.getElementById("result").innerHTML = `<div class="empty">正在识别中…</div>`;
+      setStage({ done: 1, active: 2, title: "结果 · 识别中", spinner: true });
+    } else if (lastResultData) {
+      renderResult(lastResultData, null);  // 标题/步骤由 renderResult 统一设置
+    } else {
+      document.getElementById("result").innerHTML = `<div class="empty">选择部位并上传截图后开始识别</div>`;
+      setStage({ active: 1, title: "结果" });
+    }
+  });
+
+  result.querySelectorAll(".cand img").forEach(im => {
+    im.addEventListener("click", () => showLightbox(im.dataset.big || im.src));
+  });
+
+  // 每个候选的套装按钮：弹窗内打开套装（不中断识别页）
+  result.querySelectorAll(".goto-set").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const sid = parseInt(btn.dataset.setid, 10);
+      if (sid) openSetModal(sid);
+    });
+  });
+  result.querySelectorAll(".loose-link").forEach(el => {
+    el.addEventListener("click", () => openLooseDetail(parseInt(el.dataset.itemid, 10)));
+  });
+
+  // 每个候选的心标按钮：切换心愿单
+  result.querySelectorAll(".heart-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const id = parseInt(btn.dataset.itemid, 10);
+      const r = await fetch("/api/wishlist/toggle", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({item_id: id}) });
+      const rd = await r.json();
+      const on = rd.in_wishlist;
+      btn.textContent = on ? '♥' : '♡';
+      btn.classList.toggle("on", on);
+    });
+  });
+
+  // 关联截图：勾选项关联上传原图 + 自动加心标
+  result.querySelector("#echo-link-btn").addEventListener("click", async () => {
+    const cbs = [...result.querySelectorAll(".confirm-cb")].filter(c => c.checked);
+    let ids = cbs.map(c => parseInt(c.dataset.itemid, 10)).filter(Boolean);
+    if (!ids.length) {
+      // 未勾选时默认关联精排命中项，否则 top1
+      if (isPreciseLog && hitNames.length) {
+        ids = top.filter(t => hitNames.includes(t.name)).map(t => t.item_id).filter(Boolean);
+      }
+      if (!ids.length) ids = top.filter(t => t.item_id).map(t => t.item_id).slice(0, 1);
+    }
+    if (!log.file) { alert("该记录无上传原图"); return; }
+    const btn = result.querySelector("#echo-link-btn");
+    btn.disabled = true; btn.textContent = "关联中…";
+    for (const id of ids) {
+      await fetch("/api/photo/link", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({item_id: id, file: log.file}) });
+      await fetch("/api/wishlist/toggle", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({item_id: id, ensure: true}) });
+    }
+    btn.textContent = `已关联 ${ids.length} 个并加心标`;
+    addWishlistEntry(btn);
+  });
+}
+
+/* ---------- 大图弹层 ---------- */
+const lightbox = document.getElementById("lightbox");
+const lightboxImg = document.getElementById("lightbox-img");
+function showLightbox(url) {
+  if (!url) return;
+  lightboxImg.src = url;
+  lightbox.classList.add("show");
+}
+lightbox.addEventListener("click", () => lightbox.classList.remove("show"));
+document.addEventListener("keydown", e => { if (e.key === "Escape") { lightbox.classList.remove("show"); closeModal(); } });
+
+/* ---------- 内容级弹窗（详情 / 套装） ---------- */
+const cmodal = document.getElementById("cmodal");
+const cmodalBody = document.getElementById("cmodal-body");
+const cmodalTitle = document.getElementById("cmodal-title");
+function openModal(title, html) {
+  cmodalTitle.textContent = title;
+  cmodalBody.innerHTML = html || "";
+  cmodal.classList.add("show");
+}
+
+// 散件来源详情：按 item_id 查最新数据弹窗展示（名称/部位/星级/来源/大图）
+function shortObtain(s) { s = String(s || ""); return s.length > 22 ? s.slice(0, 22) + "…" : s; }
+function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
+async function openLooseDetail(itemId) {
+  if (!itemId) return;
+  openModal("散件详情", `<div class="empty">加载中…</div>`);
+  try {
+    const res = await fetch(`/api/part/image?item_id=${itemId}`);
+    const d = await res.json();
+    if (!d.name && !d.obtain && !d.image_big) {
+      cmodalBody.innerHTML = `<div class="empty">部件不存在或已删除</div>`;
+      return;
+    }
+    const star = "★".repeat(parseInt(d.star) || 0) || "—";
+    const img = d.image_big || d.image;
+    cmodalBody.innerHTML = `
+      <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:flex-start;">
+        ${img ? `<img src="${esc(img)}" style="max-width:220px; max-height:300px; border-radius:10px; object-fit:contain; box-shadow:var(--shadow);" onerror="this.style.display='none'">` : ""}
+        <div style="flex:1; min-width:260px; line-height:2; font-size:14px;">
+          <div><b>部件：</b>${esc(d.name) || "—"}</div>
+          <div><b>部位：</b>${esc(d.type) || "—"}</div>
+          <div><b>星级：</b><span style="color:#c0392b; font-weight:600;">${star}</span></div>
+          <div><b>来源：</b>${esc(d.obtain) || "—"}</div>
+        </div>
+      </div>`;
+  } catch (e) {
+    cmodalBody.innerHTML = `<div class="empty">加载失败：${esc(e.message || e)}</div>`;
+  }
+}
+function closeModal() {
+  cmodal.classList.remove("show");
+  cmodalBody.innerHTML = "";
+}
+document.getElementById("cmodal-close").addEventListener("click", closeModal);
+cmodal.addEventListener("click", e => { if (e.target === cmodal) closeModal(); });
+
+// 历史日志详情 → 弹窗内渲染（复用 renderHistoryResult，完整信息零丢失）
+async function openLogDetail(id) {
+  openModal("日志详情", `<div class="empty">加载中…</div>`);
+  try {
+    const res = await fetch(`/api/recognize/log/${id}`);
+    const d = await res.json();
+    if (!d.log) { cmodalBody.innerHTML = `<div class="empty">日志不存在</div>`; return; }
+    cmodalTitle.textContent = `日志详情 ${d.log.id ? `#${d.log.id}` : ''} · ${d.log.types}`;
+    await renderHistoryResult(d.log, cmodalBody);
+  } catch (e) {
+    cmodalBody.innerHTML = `<div class="empty" style="color:#c0392b;">加载失败：${e}</div>`;
+  }
+}
+
+// 套装详情 → 弹窗内响应式网格（数据来自 GET /api/set/<id>）
+async function openSetModal(sid) {
+  openModal("套装详情", `<div class="empty">加载中…</div>`);
+  try {
+    const res = await fetch(`/api/set/${sid}`);
+    const d = await res.json();
+    if (!d.set) { cmodalBody.innerHTML = `<div class="empty">套装不存在</div>`; return; }
+    renderSetModal(d);
+  } catch (e) {
+    cmodalBody.innerHTML = `<div class="empty" style="color:#c0392b;">加载失败：${e}</div>`;
+  }
+}
+function renderSetModal(d) {
+  const s = d.set;
+  const items = d.items || [];
+  const wished = new Set((d.wished || []).map(String));
+  cmodalTitle.textContent = `套装 · ${s.name}`;
+  let html = `<div style="display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap; margin-bottom:14px;">
+    ${s.preview ? `<img src="${s.preview}" data-big="${s.preview}" style="width:150px; border-radius:10px; border:1px solid var(--border); object-fit:contain; background:#faf8f3; cursor:zoom-in;" title="点击查看大图">` : ""}
+    <div>
+      <div style="font-size:17px; font-weight:700;">${s.name}${s.alias ? ` <span style="font-size:13px; color:var(--muted);">（${s.alias}）</span>` : ""}</div>
+      <div style="font-size:13px; color:var(--muted); margin-top:6px;">${s.star} 星 · ${s.obtain || "未知来源"}${s.attribute ? ` · 风格：${s.attribute}` : ""}</div>
+      <div style="font-size:12px; color:var(--muted); margin-top:4px;">部件 ${items.length} 件</div>
+    </div>
+  </div>`;
+  html += `<div class="set-items">`;
+  items.forEach(i => {
+    const w = wished.has(String(i.id));
+    html += `<div class="set-item ${i.owned ? "owned" : ""}" data-itemid="${i.id}">
+      ${i.image ? `<img src="${i.image}" data-big="${i.image_big || i.image}" loading="lazy" title="点击查看大图">` : `<div style="height:130px; display:flex; align-items:center; color:var(--muted); font-size:12px;">无图</div>`}
+      <div class="name">${i.name}</div>
+      <div class="type">${i.type}${i.star ? ` · ${i.star}星` : ""}</div>
+      <button class="heart-btn ${w ? "on" : ""}" data-itemid="${i.id}" title="加入/移出心愿单">${w ? "♥" : "♡"}</button>
+      <label class="owned-toggle"><input type="checkbox" ${i.owned ? "checked" : ""}> 已拥有</label>
+    </div>`;
+  });
+  html += `</div>`;
+  cmodalBody.innerHTML = html;
+  cmodalBody.querySelectorAll(".set-item img").forEach(im => {
+    im.addEventListener("click", () => showLightbox(im.dataset.big || im.src));
+  });
+  cmodalBody.querySelectorAll(".heart-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const itemId = parseInt(btn.dataset.itemid, 10);
+      const r = await fetch("/api/wishlist/toggle", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ item_id: itemId }),
+      });
+      const rd = await r.json();
+      btn.classList.toggle("on", !!rd.in_wishlist);
+      btn.textContent = rd.in_wishlist ? "♥" : "♡";
+    });
+  });
+  cmodalBody.querySelectorAll(".owned-toggle input").forEach(cb => {
+    cb.addEventListener("change", async () => {
+      const card = cb.closest(".set-item");
+      const itemId = parseInt(card.dataset.itemid, 10);
+      try {
+        await fetch("/api/owned", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ item_id: itemId, owned: cb.checked ? 1 : 0 }),
+        });
+        card.classList.toggle("owned", cb.checked);
+      } catch (e) { /* 静默失败，复选框状态保持原样由用户重试 */ }
+    });
+  });
+}
+
+// 初始化：独立日志详情页（/recognize/log/<id>）→ 自动定位渲染该条日志
+const mLogId = location.pathname.match(/^\/recognize\/log\/(\d+)$/);
+if (mLogId) {
+  standaloneLog = true;
+  // 独立详情页：隐藏 Tab 与底部操作栏，只保留详情内容
+  document.querySelectorAll(".tabs").forEach(el => el.style.display = "none");
+  const dockEl = document.querySelector(".bottom-dock");
+  if (dockEl) dockEl.style.display = "none";
+  (async () => {
+    const box = document.getElementById("result");
+    try {
+      const res = await fetch(`/api/recognize/log/${mLogId[1]}`);
+      const d = await res.json();
+      if (d.log) {
+        setStage({ title: "结果 · 日志详情" });
+        renderHistoryResult(d.log);
+      } else {
+        box.innerHTML = `<div class="empty">日志不存在或已被清理</div>`;
+        setStage({ title: "结果 · 日志详情" });
+      }
+    } catch (e) {
+      box.innerHTML = `<div class="empty">加载失败：${e}</div>`;
+      setStage({ title: "结果 · 日志详情" });
+    }
+  })();
+}
+
+/* ---------- Tab 切换：识别工作台 / 历史独立页 ---------- */
+const tabBtns = document.querySelectorAll(".tab");
+const DOCK_BTN_IDS = ["precise-btn", "confirm-btn", "crop-rerun", "crop-reedit", "crop-confirm", "crop-cancel", "crop-pause", "crop-redraw"];
+function switchTab(name) {
+  tabBtns.forEach(b => b.classList.toggle("active", b.dataset.tab === name));
+  document.querySelectorAll(".tab-pane").forEach(p => p.classList.toggle("active", p.id === `pane-${name}`));
+  if (name === "history") {
+    loadHistory();
+    DOCK_BTN_IDS.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = "none"; });
+  } else {
+    // 切回识别工作台：按 cropPhase 恢复裁剪按钮；结果有候选时恢复精排/关联入口
+    updateCropButtons();
+    if (document.querySelector("#result .cand-grid")) {
+      ["precise-btn", "confirm-btn"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'inline-block';
+      });
+    }
+  }
+}
+tabBtns.forEach(btn => btn.addEventListener("click", () => switchTab(btn.dataset.tab)));
+
+/* ---------- 历史搜索：按部件名/套装筛选（全量过滤后分页渲染） ---------- */
+const histSearch = document.getElementById("hist-search");
+histSearch.addEventListener("input", () => {
+  histPage = 1;
+  if (histLogs.length) renderHist();
+});
+
+/* ---------- 识别任务断点续跑：页面刷新/跳转后回来，自动续上后台任务 ---------- */
+function saveSessionTask(kind) {
+  try {
+    sessionStorage.setItem("yslz_task", JSON.stringify({
+      task_id: cropTaskId, kind,
+      crop_file: cropFile, crop_orig: cropOrigFile || lastFileName, types: cropTypes, box: cropBox,
+      coarse: lastCoarse || [], time: Date.now()
+    }));
+  } catch (e) { /* sessionStorage 满或不可用，忽略 */ }
+}
+function clearSessionTask() {
+  try { sessionStorage.removeItem("yslz_task"); } catch (e) {}
+}
+// 裁剪请求前的落盘：fetch 被打断/导航时保留，回来自动重跑（后端幂等，可安全重提交）
+function saveCropPending(box) {
+  try {
+    sessionStorage.setItem("yslz_crop_pending", JSON.stringify({
+      lastFileName, types: typeSel.value, box: box || null, time: Date.now()
+    }));
+  } catch (e) { /* sessionStorage 满或不可用，忽略 */ }
+}
+function clearCropPending() {
+  try { sessionStorage.removeItem("yslz_crop_pending"); } catch (e) {}
+}
+// 裁剪完成、手动框待确认时的落盘：离开页面回来可恢复「接着跑粗排」按钮态
+function saveCropReady() {
+  try {
+    sessionStorage.setItem("yslz_crop_ready", JSON.stringify({
+      crop_file: cropFile, crop_orig: cropOrigFile || lastFileName,
+      types: cropTypes, box: cropBox || null, time: Date.now()
+    }));
+  } catch (e) { /* sessionStorage 满或不可用，忽略 */ }
+}
+function clearCropReady() {
+  try { sessionStorage.removeItem("yslz_crop_ready"); } catch (e) {}
+}
+
+(async () => {
+  if (standaloneLog) return;  // 独立详情页无识别工作台，不恢复
+
+  // ---- 1) 进行中的后台任务（crop/recall/precise）：轮询续跑 ----
+  let s = null;
+  try { s = JSON.parse(sessionStorage.getItem("yslz_task") || "null"); } catch (e) {}
+  if (s && s.task_id) {
+    // 重建识别上下文
+    if (s.crop_file) { cropFile = s.crop_file; lastCropFile = s.crop_file; }
+    if (s.crop_orig) { cropOrigFile = s.crop_orig; lastFileName = s.crop_orig; }
+    if (s.types) { cropTypes = s.types; typeSel.value = s.types; }  // 同步下拉框，续跑粗排部位不丢
+    if (s.box) cropBox = s.box;
+    if (Array.isArray(s.coarse) && s.coarse.length) lastCoarse = s.coarse;
+
+    const r = await pollTask(s.task_id);
+    clearSessionTask();
+    if (r.status === "done") {
+      const data = { file: cropOrigFile, crop_file: cropFile, box: cropBox, coarse: lastCoarse };
+      lastResultData = data;
+      cropPhase = "ready";
+      if (s.kind === "precise") {
+        const hitIds = (r.result && r.result.hit_ids) || [];
+        updateCropButtons();
+        renderResult(data, hitIds);
+        toast(hitIds.length ? `识别已完成，精排命中 ${hitIds.length} 个` : "识别已完成，精排未命中");
+      } else if (s.kind === "crop") {
+        // 裁剪任务完成：手动框 → 待确认；自动 → 直接续跑粗排
+        const d = r.result || {};
+        if (d.file) { lastFileName = d.file; cropOrigFile = d.file; }
+        else if (cropOrigFile) { lastFileName = cropOrigFile; }  // d.file 缺失时回退已恢复的原图
+        if (d.crop_file) { cropFile = d.crop_file; lastCropFile = d.crop_file; }
+        if (d.box) cropBox = d.box;
+        cropTypes = s.types || cropTypes;
+        if (s.box) {
+          cropPhase = "rerun_ready";
+          renderCropPanel(d, null);
+          setStage({ done: 2, title: "结果 · 已裁剪，确认框选后点「接着跑粗排」" });
+          saveCropReady();
+          toast("裁剪已完成，确认框选后点「接着跑粗排」");
+        } else {
+          cropPhase = "locating";
+          renderCropPanel(d, null);
+          toast("正在自动续跑粗排…");
+          await runRecall();
+        }
+      } else if (r.result && !r.result.error) {
+        const d = r.result;
+        d.file = cropOrigFile; d.crop_file = cropFile; d.box = cropBox;
+        lastCoarse = d.coarse || [];
+        lastResultData = d;
+        renderResult(d, null);
+        toast("识别已完成（离开页面后自动续上）");
+      } else {
+        toast(`识别失败：${(r.result && r.result.error) || "未知错误"}`);
+      }
+    } else if (r.status === "error") {
+      toast(`上次识别失败：${r.error || "任务已失效"}（结果可在历史查看）`);
+    } else if (r.status === "cancelled") {
+      toast("上次识别已暂停，结果可在历史查看");
+    }
+    loadHistory();
+    return;
+  }
+
+  // ---- 2) 裁剪已完成、手动框待确认（等用户点「接着跑粗排」） ----
+  let p = null;
+  try { p = JSON.parse(sessionStorage.getItem("yslz_crop_ready") || "null"); } catch (e) {}
+  if (p && p.crop_file) {
+    cropFile = p.crop_file; lastCropFile = p.crop_file;
+    cropOrigFile = p.crop_orig; lastFileName = p.crop_orig;
+    cropTypes = p.types || cropTypes || typeSel.value;
+    if (cropTypes) typeSel.value = cropTypes;  // 同步下拉框，方便直接改部位
+    cropBox = p.box || null;
+    cropPhase = "rerun_ready";
+    renderCropPanel(null, null);
+    setStage({ done: 2, title: "结果 · 已裁剪，确认框选后点「接着跑粗排」" });
+    updateCropButtons();
+    toast("上次裁剪已保存，确认框选后点「接着跑粗排」");
+    return;
+  }
+
+  // ---- 3) 裁剪请求被中断（fetch 未返回）：任务可能已提交，幂等重提交续跑 ----
+  let q = null;
+  try { q = JSON.parse(sessionStorage.getItem("yslz_crop_pending") || "null"); } catch (e) {}
+  if (q && q.types) {
+    sessionStorage.removeItem("yslz_crop_pending");
+    if (!q.lastFileName) {
+      toast("上次识别未完成（原图未上传成功），请重新上传");
+      return;
+    }
+    lastFileName = q.lastFileName; cropOrigFile = q.lastFileName; updateCacheTip();
+    typeSel.value = q.types;
+    toast("正在恢复上次被中断的裁剪…");
+    startCrop(q.box || null);
+  }
+})();
+</script>
+</body>
+</html> 
